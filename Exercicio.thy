@@ -58,21 +58,57 @@ fun h_height:: "ach_term \<Rightarrow> nat" where (*Move*)
 value "h_height (Fun Hom [Fun Hom [Var x]])"
 value "h_height (Fun Hom [Fun AC [Var x, Var y], Fun Hom [Var z]])"
 
+(*
+type_synonym ('f, 'v) equation = "('f, 'v) term \<times> ('f, 'v) term"
+*)
+
 type_synonym ach_equation = "(\<F>, \<V>) equation"
-type_synonym ach_equations = "(\<F>, \<V>) equations"
+type_synonym ach_equations = "(\<F>, \<V>) equation list"
 
 
 definition is_flattened :: "ach_equation \<Rightarrow> bool" where
 "is_flattened eq \<longleftrightarrow> (case eq of 
 (Var _, Var _) \<Rightarrow>  True | 
-(Var _ , Fun _ ts) \<Rightarrow> (\<forall> t \<in> set ts. is_Var t) 
-| _ \<Rightarrow> False)"
+(Var _ , Fun _ ts) \<Rightarrow> (\<forall> t \<in> set ts. is_Var t) |
+_ \<Rightarrow> False)"
 
 definition flattened_problem :: "ach_equations \<Rightarrow> bool" where
 "flattened_problem \<Gamma> \<longleftrightarrow> (\<forall> eq \<in> \<Gamma>. is_flattened eq)"
 
+(*
+Flatten Both Sides
+{t1=t2}\<union>\<Gamma> \<Rightarrow> {V=t1, V=t2}\<union> \<Gamma>, \<not> is_Var t1 \<and> \<not> is_Var t2
+*)
+
+fun fbs:: "ach_equations \<Rightarrow> ach_equations" where
+  "fbs [] = []" |
+  "fbs ((t1,t2) # \<Gamma>) = 
+  (if (\<not> is_Var t1)\<and>(\<not> is_Var t2) then 
+    let V = Var 100 in 
+    [(V,t1),(V,t2)]@ (fbs \<Gamma>)
+   else 
+    (t1,t2)#(fbs \<Gamma>))"
 
 
+(* 
+   \<forall> (t1, t2) \<in> fbs (\<Gamma>) = (is_Var t1 \<or> is_Var t2)
+*)
+
+lemma fbs_correctness: "(ListMem (t1, t2) (fbs(\<Gamma>))) \<Longrightarrow> (is_Var t1) \<or> (is_Var t2)"
+  apply (induction \<Gamma>)
+   apply (simp add: ListMem_iff)
+  apply (auto)
+  
+  
+
+(* (V, Fun f ts1) # ((V, Fun g ts2) # \<Gamma>) *)
+
+(* 
+(case eq of
+  let V = Var 100 in
+  (Fun f ts1, Fun g ts2) \<Rightarrow> \<Gamma>|
+  _ \<Rightarrow> eq # \<Gamma>)"
+ *)
 
 
 end
