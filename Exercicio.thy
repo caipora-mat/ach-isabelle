@@ -14,14 +14,28 @@ datatype \<F> = Unin string | AC | Hom
 
 type_synonym \<V> = nat
 
+
 type_synonym ach_term = "(\<F>, \<V>) term"
 
 locale ACh_properties = 
-  fixes Fun
-    and AC
-    and Hom
-  assumes assoc: "Fun AC [(Fun AC [t1,t2]), t3] = Fun AC [t1 , Fun AC [t2,t3]]"
-    and homomorphism: "Fun Hom [AC [t1,t2]] = Fun AC [Hom [t1], Hom [t2]]"
+  fixes Fun :: "\<F> \<Rightarrow> ach_term list \<Rightarrow> ach_term"
+    and AC :: "\<F>"
+    and Hom :: "\<F>"
+  assumes assoc : "Fun AC [t1, Fun AC [t2, t3]] = Fun AC [Fun AC [t1, t2], t3]" 
+    and commut : "Fun AC [t1, t2] = Fun AC [t2, t1]"
+    and hmorph : "Fun Hom [Fun AC [t1, t2]] = Fun AC [Fun Hom [t1], Fun Hom [t2]]"
+
+print_locale! ACh_properties
+
+thm ACh_properties_def
+
+thm ACh_properties.assoc
+
+thm ACh_properties.commut
+
+thm ACh_properties.hmorph
+
+
 
 (*
 h_height(t) = 0, if t=x
@@ -92,12 +106,29 @@ fun fbs:: "ach_equations \<Rightarrow> ach_equations" where
 
 (* 
    \<forall> (t1, t2) \<in> fbs (\<Gamma>) = (is_Var t1 \<or> is_Var t2)
+
+ a = (s, t)
+
+ListMem (t1, t2) (fbs ((s,t) # \<Gamma>)
+Caso 1: (\<not> is_Var s) \<and> (\<not> is_Var t) \<Longrightarrow> (fbs ((s,t) # \<Gamma>) = [(V, s), (V, t)] @ (fbs \<Gamma>)
+
+ListMem (t1, t2) ([(V, s), (V, t)] @ (fbs \<Gamma>)) 
+
+
+Caso 2: (is_Var s) \<or> (is_Var t)
 *)
 
 lemma fbs_correctness: "(ListMem (t1, t2) (fbs(\<Gamma>))) \<Longrightarrow> (is_Var t1) \<or> (is_Var t2)"
   apply (induction \<Gamma>)
-   apply (simp add: ListMem_iff)
-  apply (auto)
+    apply (simp add: ListMem_iff)
+  apply (simp add: ListMem_iff)
+  by (smt (verit, ccfv_threshold) append.right_neutral append_Cons append_eq_append_conv2 fbs.elims
+      list.distinct(1) list.inject prod.sel(1,2) same_append_eq set_ConsD term.disc(1))
+
+
+
+
+
   
   
 
