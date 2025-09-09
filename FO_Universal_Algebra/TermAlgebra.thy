@@ -30,7 +30,7 @@ for the theory of terms.
   (type classes? locales?)
 *)
 
-(* some testing *)
+(* Decidable equality with computational \<open>eq\<close>. *)
 class eq =
   fixes eq :: \<open>'a \<Rightarrow> 'a \<Rightarrow> bool\<close>
 
@@ -54,13 +54,16 @@ class labelled =
 produces an error.
 This is a bit annoying... *)
 
-(* This limitation forces us to use a concrete type for labelling, like nat... 
+(*
+This limitation forces us to use a concrete type for labelling, like \<open>nat\<close>
 Then a labelled structure (signature) could be defined as follows:
 *)
 class signature = eq +
   fixes ar :: \<open>'a \<Rightarrow> nat\<close>
-  fixes label :: \<open>'a \<Rightarrow> nat\<close>
+  fixes label :: \<open>'a \<Rightarrow> int\<close>
   assumes label_inj : "inj label "
+
+type_synonym ('f, 'v) tm = \<open>('f :: signature, 'v :: eq) term\<close>
 
 text \<open>
   So a signature is a type \<open>'a\<close> that has a notion of equality, an arity function,
@@ -68,8 +71,22 @@ text \<open>
   We can force our notion of terms to use this type class.
 \<close>
 
+text \<open>
+  Okay, it seems that \<open>locales\<close> allow for more than one type variable in its
+  definition.
+  Then perhaps writing labelled structures as locales might be a better idea.
 
+  Let us try that now.
+\<close>
 
+(* Locales allows for the usage of different type-variables but type variables
+cannot be parametrized by terms (so no dependent types is present).
+*)
+locale lab_sig =
+  fixes S :: "'f :: signature"
+  fixes ar :: "'f \<Rightarrow> nat" (* it is possible to add type class constraints when definiting locales *)
+  fixes label :: "'f \<Rightarrow> 'l"
+  assumes inj_label : \<open>inj label\<close>
 
 
 end

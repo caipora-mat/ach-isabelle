@@ -140,3 +140,47 @@ let fn_dec (p : ('f, 'x) unifProb) =
     else
       exit 0
   | _ -> exit 0
+
+
+
+
+
+(*
+
+Inductive tm (F VS : Type) : Type :=
+  | varTm : forall (x : VS), tm F VS
+  | funTm : forall (f : F) (ts : list (tm F VS)), tm F VS.
+
+Arguments varTm {_} {_} _.
+Arguments funTm {_} {_} _ _.
+
+Inductive SK := U | AC | H | INV.
+
+Class sig (F : Type) `{isFinite F} := {
+  ar : F -> nat ;
+  label : F -> SK ;
+  label_inj : forall ( f g : F), label f = label g -> f = g
+}.
+
+Fixpoint h_height
+         {F VS : Type}
+         `{sig F}
+         (t : tm F VS)
+  : nat.
+Proof.
+  refine
+  match t with
+  | varTm x => 0
+  | funTm f ts =>
+    match (label f) with
+    | H => _
+    | _ => _
+    end
+  end.
+
+
+
+
+
+
+*)
