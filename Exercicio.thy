@@ -10,30 +10,52 @@ theory Exercicio
 begin
 
 
-datatype \<F> = Unin string | AC | Hom
 
-type_synonym \<V> = nat
+datatype ach = Unin | AC | Hom
+
+type_synonym ('f, 'v) equations = "('f, 'v) equation list"
+
+definition is_flattened :: "('f, 'v) equation \<Rightarrow> bool" where
+"is_flattened eq \<longleftrightarrow> (case eq of 
+  (Var _, Var _) \<Rightarrow>  True | 
+  (Var _ , Fun _ ts) \<Rightarrow> (\<forall> t \<in> set ts. is_Var t) |
+  (Fun _ ts, Var _) \<Rightarrow> True|
+  _ \<Rightarrow> False)"
+
+definition flattened_problem :: "('f, 'v) equations \<Rightarrow> bool" where
+"flattened_problem \<Gamma> \<longleftrightarrow> (\<forall> eq \<in> \<Gamma>. is_flattened eq)"
+
+fun fbs:: "('f, 'v) equations \<Rightarrow> ('f, 'v) equations" where
+  "fbs [] = []" |
+  "fbs ((t1,t2) # \<Gamma>) = 
+  (if (\<not> is_Var t1)\<and>(\<not> is_Var t2) then 
+    let V = Var 100 in 
+    [(V,t1),(V,t2)]@ (fbs \<Gamma>)
+   else 
+    (t1,t2)#(fbs \<Gamma>))"
 
 
-type_synonym ach_term = "(\<F>, \<V>) term"
+locale signature = 
+  fixes arity :: "'f \<Rightarrow> nat"
+    and label :: "'f \<Rightarrow> ach"
+  assumes label_inj: "inj label"
 
-locale ACh_properties = 
-  fixes Fun :: "\<F> \<Rightarrow> ach_term list \<Rightarrow> ach_term"
-    and AC :: "\<F>"
-    and Hom :: "\<F>"
-  assumes assoc : "Fun AC [t1, Fun AC [t2, t3]] = Fun AC [Fun AC [t1, t2], t3]" 
-    and commut : "Fun AC [t1, t2] = Fun AC [t2, t1]"
-    and hmorph : "Fun Hom [Fun AC [t1, t2]] = Fun AC [Fun Hom [t1], Fun Hom [t2]]"
+begin
 
-print_locale! ACh_properties
+fun h_height:: "('f, 'v) term \<Rightarrow> nat" where (*Move*)
+"h_height (Var x) = 0"|
+"h_height (Fun f ts) = (if (label f = Hom) then
+    (1 + foldl max 0 (map h_height ts))
+    else foldl max 0 (map h_height ts))"
 
-thm ACh_properties_def
 
-thm ACh_properties.assoc
 
-thm ACh_properties.commut
 
-thm ACh_properties.hmorph
+end
+
+
+
+
 
 
 
@@ -58,26 +80,22 @@ foldl f 0 (t#ts) =  foldl f (f 0 t) ts
 
 *)
 
-fun h_height:: "ach_term \<Rightarrow> nat" where (*Move*)
+(* fun h_height:: "term \<Rightarrow> nat" where (*Move*)
 "h_height (Var x) = 0"|
 "h_height (Fun (Unin f) (ts)) = (foldl max 0 (map h_height ts))"|
 "h_height (Fun AC (ts)) = (foldl max 0 (map h_height ts))" |
 "h_height (Fun Hom (ts)) = 1 + (foldl max 0 (map h_height ts))"
 
-(*
+
   height h(h(y)) = 1 + height(h(y)) = 1 + 1 + height(y)
   height h([t1,t2]) = 1 + max(height(t1),height(t2))
 *)
 
-value "h_height (Fun Hom [Fun Hom [Var x]])"
-value "h_height (Fun Hom [Fun AC [Var x, Var y], Fun Hom [Var z]])"
 
 (*
 type_synonym ('f, 'v) equation = "('f, 'v) term \<times> ('f, 'v) term"
 *)
 
-type_synonym ach_equation = "(\<F>, \<V>) equation"
-type_synonym ach_equations = "(\<F>, \<V>) equation list"
 
 
 definition is_flattened :: "ach_equation \<Rightarrow> bool" where
