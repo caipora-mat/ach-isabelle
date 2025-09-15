@@ -13,10 +13,16 @@ begin
 
 datatype ach = Unin | AC | Hom
 
-type_synonym ('f, 'v) equations = "('f, 'v) equation list"
+value "vars_term (Var x)"
 
-definition is_flattened :: "('f, 'v) equation \<Rightarrow> bool" where
-"is_flattened eq \<longleftrightarrow> (case eq of 
+definition vars_eq :: "('f, 'v) equation \<Rightarrow> 'v set" 
+  where "vars_eq e \<equiv> let (s, t) = e in vars_term s \<union> vars_term t"
+
+definition vars_eqs :: "('f, 'v) equations \<Rightarrow> 'v set"
+  where "vars_eqs \<Gamma> \<equiv> \<Union> e \<in> \<Gamma>. vars_eq e"
+
+definition is_flattened :: "('f, 'v) equation \<Rightarrow> bool" 
+  where "is_flattened eq \<longleftrightarrow> (case eq of 
   (Var _, Var _) \<Rightarrow>  True | 
   (Var _ , Fun _ ts) \<Rightarrow> (\<forall> t \<in> set ts. is_Var t) |
   (Fun _ ts, Var _) \<Rightarrow> True|
@@ -26,13 +32,13 @@ definition flattened_problem :: "('f, 'v) equations \<Rightarrow> bool" where
 "flattened_problem \<Gamma> \<longleftrightarrow> (\<forall> eq \<in> \<Gamma>. is_flattened eq)"
 
 fun fbs:: "('f, 'v) equations \<Rightarrow> ('f, 'v) equations" where
-  "fbs [] = []" |
-  "fbs ((t1,t2) # \<Gamma>) = 
+  "fbs {} = {}" |
+  "fbs (insert (t1,t2) \<Gamma>) = 
   (if (\<not> is_Var t1)\<and>(\<not> is_Var t2) then 
-    let V = Var 100 in 
-    [(V,t1),(V,t2)]@ (fbs \<Gamma>)
+    let V  = (fresh (vars_eqs \<Gamma>) V) in 
+    {(V,t1),(V,t2)} \<union> (fbs \<Gamma>)
    else 
-    (t1,t2)#(fbs \<Gamma>))"
+    insert (t1,t2) (fbs \<Gamma>))"
 
 
 locale signature = 
