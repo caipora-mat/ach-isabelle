@@ -1,6 +1,6 @@
 (*
 Author: Guilherme Borges Brandão <borgesbrandao13@gmail.com>
-Author: Daniele Nantes Sobrinho <d.nantes-sobrinho@imperial.ac.uk> 
+Author: Daniele Nantes Sobrinho <d.nantes-sobrinho@imperial.ac.uk>
 *)
 
 theory Exercicio
@@ -14,37 +14,90 @@ begin
 datatype ach = Unin | AC | Hom
 
 value "vars_term (Var x)"
+value "vars_term (Fun f [Var x, Var y])"
+
+
+value "args (Fun f [Var x, Var y])"
+
+type_synonym ('f, 'v) problem = "('f, 'v) equation list"
 
 definition vars_eq :: "('f, 'v) equation \<Rightarrow> 'v set" 
   where "vars_eq e \<equiv> let (s, t) = e in vars_term s \<union> vars_term t"
 
-definition vars_eqs :: "('f, 'v) equations \<Rightarrow> 'v set"
-  where "vars_eqs \<Gamma> \<equiv> \<Union> e \<in> \<Gamma>. vars_eq e"
+definition vars_eqs :: "('f, 'v) problem \<Rightarrow> 'v set"
+  where "vars_eqs \<Gamma> \<equiv> \<Union> e \<in> set \<Gamma>. vars_eq e"
+
+definition new_var :: "('f, nat) problem \<Rightarrow> nat"
+  where "new_var \<Gamma> \<equiv> Max (vars_eqs \<Gamma>) + 1"
+
 
 definition is_flattened :: "('f, 'v) equation \<Rightarrow> bool" 
   where "is_flattened eq \<longleftrightarrow> (case eq of 
   (Var _, Var _) \<Rightarrow>  True | 
   (Var _ , Fun _ ts) \<Rightarrow> (\<forall> t \<in> set ts. is_Var t) |
-  (Fun _ ts, Var _) \<Rightarrow> True|
+  (Fun _ ts, Var _) \<Rightarrow> (\<forall> t \<in> set ts. is_Var t)|
   _ \<Rightarrow> False)"
+
+(*
++[s1, ..., sn] tal que s1,..., sn nao tem ocorrencias de +
++[+[s1,s2], s3]] \<longrightarrow>+ +[s1, s2, s3] 
+
+Pseudo-código: 
+
+real_flat_aux :: term \<Rightarrow> term list \<Rightarrow> term list where
+  real_flat_aux t acc = 
+     (case t of 
+      Var x \<Rightarrow> t # acc |
+      Fun f (s#ts) \<Rightarrow> (case (label f) of 
+       AC \<Rightarrow> (case s of 
+            Var y = (s # acc)@(real_flat_aux ts) |
+            Fun f' s' = (case (label f') of
+                AC \<Rightarrow> (list.map real_flat_aux s') # acc
+                _ \<Rightarrow> passa real_flat_aux pra dentro)
+          )
+       _ \<Rightarrow> (Fun f (list.map real_flat_aux ts)) # acc \<dots> (aplicar real_flat_aux no ts)
+      )
+    )
+
+
+real_flat ::  term \<Rightarrow> term
+ real_flat (Fun + ts) = 
+    let tm_args = real_flat_aux ts [] in    (Caso +, analisar os outros casos)
+      Fun + tm_args
+ real_flat (Fun h ts) = ...
+
+real_flat Fun + t1#ts \<Rightarrow> (if t1 = Fun + ts' then
+   Fun + (ts' @ real_flat Fun + ts))
+
+*)
 
 definition flattened_problem :: "('f, 'v) equations \<Rightarrow> bool" where
 "flattened_problem \<Gamma> \<longleftrightarrow> (\<forall> eq \<in> \<Gamma>. is_flattened eq)"
 
-fun fbs:: "('f, 'v) equations \<Rightarrow> ('f, 'v) equations" where
-  "fbs {} = {}" |
-  "fbs (insert (t1,t2) \<Gamma>) = 
+fun fbs:: "('f, nat) problem \<Rightarrow> ('f, nat) problem" where
+  "fbs [] = []" |
+  "fbs ((t1,t2) # \<Gamma>) = 
   (if (\<not> is_Var t1)\<and>(\<not> is_Var t2) then 
-    let V  = (fresh (vars_eqs \<Gamma>) V) in 
-    {(V,t1),(V,t2)} \<union> (fbs \<Gamma>)
+    let V = new_var ((t1,t2) # \<Gamma>)  in 
+    [(Var V,t1),(Var V,t2)]@(fbs \<Gamma>)
    else 
-    insert (t1,t2) (fbs \<Gamma>))"
+    (t1,t2)#(fbs \<Gamma>))"
+
+
+lemma fbs_correctness: "(ListMem (t1, t2) (fbs(\<Gamma>))) \<Longrightarrow> (is_Var t1) \<or> (is_Var t2)"
+  sorry
 
 
 locale signature = 
   fixes arity :: "'f \<Rightarrow> nat"
     and label :: "'f \<Rightarrow> ach"
   assumes label_inj: "inj label"
+
+locale our_symbols = signature +
+  fixes plus :: 'f (\<open>\<^bold>+\<close>)
+    and h :: 'f
+  assumes plus_ac: "label \<^bold>+ = AC"
+    and h_hom : "label h = Hom"
 
 begin
 
@@ -54,6 +107,57 @@ fun h_height:: "('f, 'v) term \<Rightarrow> nat" where (*Move*)
     (1 + foldl max 0 (map h_height ts))
     else foldl max 0 (map h_height ts))"
 
+fun get_args_ac:: "('f, 'v) term \<Rightarrow> ('f, 'v) term list" where
+  "get_args_ac t = (case t of 
+                    Fun f ts \<Rightarrow> (case label f of
+                                AC \<Rightarrow> args (Fun f ts)|
+                                _ \<Rightarrow> [Fun f ts]
+                                ) |
+                    _ \<Rightarrow> [t]
+                    )"
+
+fun remove_ac_symbols :: "('f, 'v) term list \<Rightarrow> ('f, 'v) term list list" where
+  "remove_ac_symbols [] = []" |
+  "remove_ac_symbols (t # ts) = (case t of
+                                Fun f ss' \<Rightarrow> (case label f of
+                                              AC \<Rightarrow> (map get_args_ac ss') |
+                                              _ \<Rightarrow> [Fun f ss'] # (remove_ac_symbols ts)) |
+                                Var x \<Rightarrow> [Var x]#(remove_ac_symbols ts)
+                                 )"
+  
+
+fun flatten_list :: "'a list list \<Rightarrow> 'a list" where (*Move*)
+  "flatten_list [] = []" |
+  "flatten_list (l # ls) = l @ (flatten_list ls)"
+
+fun flat_args_ac :: "('f, 'v) term \<Rightarrow> ('f, 'v) term list" where
+  "flat_args_ac (Var x) = []" |
+  "flat_args_ac (Fun f ts) = (case label f of
+                              AC \<Rightarrow> flatten_list (remove_ac_symbols ts) | 
+                              _ \<Rightarrow> ts)"
+
+fun real_flat :: "('f, 'v) term \<Rightarrow> ('f, 'v) term" where
+  "real_flat (Var x) = Var x" | 
+  "real_flat (Fun f ts) = Fun f (flat_args_ac (Fun f ts))"
+
+
+
+
+(*fun real_flat_aux :: "('f, 'v) term \<Rightarrow> ('f, 'v) term list \<Rightarrow> ('f, 'v) term list" where
+  "real_flat_aux t acc = 
+     (case t of 
+      Var x \<Rightarrow> t # acc |
+      Fun f s#ts \<Rightarrow> (case (label f) of
+                       AC \<Rightarrow> (case s of 
+                              Var y \<Rightarrow> (s # acc)@(map real_flat_aux ts) |
+                              Fun f' s' = (case (label f') of
+                                           AC \<Rightarrow> (map real_flat_aux s') # acc |
+                                           _ \<Rightarrow> ((Fun f' real_flat_aux s')#acc)@(map real_flat_aux ts)
+                                         )
+                              )
+                     )
+      )"
+*)
 
 
 
@@ -98,34 +202,12 @@ foldl f 0 (t#ts) =  foldl f (f 0 t) ts
 *)
 
 
-(*
-type_synonym ('f, 'v) equation = "('f, 'v) term \<times> ('f, 'v) term"
-*)
-
-
-
-definition is_flattened :: "ach_equation \<Rightarrow> bool" where
-"is_flattened eq \<longleftrightarrow> (case eq of 
-(Var _, Var _) \<Rightarrow>  True | 
-(Var _ , Fun _ ts) \<Rightarrow> (\<forall> t \<in> set ts. is_Var t) |
-_ \<Rightarrow> False)"
-
-definition flattened_problem :: "ach_equations \<Rightarrow> bool" where
-"flattened_problem \<Gamma> \<longleftrightarrow> (\<forall> eq \<in> \<Gamma>. is_flattened eq)"
 
 (*
 Flatten Both Sides
 {t1=t2}\<union>\<Gamma> \<Rightarrow> {V=t1, V=t2}\<union> \<Gamma>, \<not> is_Var t1 \<and> \<not> is_Var t2
 *)
 
-fun fbs:: "ach_equations \<Rightarrow> ach_equations" where
-  "fbs [] = []" |
-  "fbs ((t1,t2) # \<Gamma>) = 
-  (if (\<not> is_Var t1)\<and>(\<not> is_Var t2) then 
-    let V = Var 100 in 
-    [(V,t1),(V,t2)]@ (fbs \<Gamma>)
-   else 
-    (t1,t2)#(fbs \<Gamma>))"
 
 
 (* 
@@ -141,13 +223,6 @@ ListMem (t1, t2) ([(V, s), (V, t)] @ (fbs \<Gamma>))
 
 Caso 2: (is_Var s) \<or> (is_Var t)
 *)
-
-lemma fbs_correctness: "(ListMem (t1, t2) (fbs(\<Gamma>))) \<Longrightarrow> (is_Var t1) \<or> (is_Var t2)"
-  apply (induction \<Gamma>)
-    apply (simp add: ListMem_iff)
-  apply (simp add: ListMem_iff)
-  by (smt (verit, ccfv_threshold) append.right_neutral append_Cons append_eq_append_conv2 fbs.elims
-      list.distinct(1) list.inject prod.sel(1,2) same_append_eq set_ConsD term.disc(1))
 
 
 
