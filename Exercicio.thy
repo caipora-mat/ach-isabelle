@@ -138,7 +138,7 @@ fun flat_args_ac :: "('f, 'v) term \<Rightarrow> ('f, 'v) term list" where
 
 fun real_flat :: "('f, 'v) term \<Rightarrow> ('f, 'v) term" where
   "real_flat (Var x) = Var x" | 
-  "real_flat (Fun f ts) = Fun f (flat_args_ac (Fun f ts))"
+  "real_flat (Fun f ts) = Fun f (flat_args_ac (Fun f (map real_flat ts)))"
 
 
 
