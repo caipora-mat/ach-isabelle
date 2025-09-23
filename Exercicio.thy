@@ -93,11 +93,6 @@ locale signature =
     and label :: "'f \<Rightarrow> ach"
   assumes label_inj: "inj label"
 
-locale our_symbols = signature +
-  fixes plus :: 'f (\<open>\<^bold>+\<close>)
-    and h :: 'f
-  assumes plus_ac: "label \<^bold>+ = AC"
-    and h_hom : "label h = Hom"
 
 begin
 
@@ -116,32 +111,89 @@ fun get_args_ac:: "('f, 'v) term \<Rightarrow> ('f, 'v) term list" where
                     _ \<Rightarrow> [t]
                     )"
 
+
 fun remove_ac_symbols :: "('f, 'v) term list \<Rightarrow> ('f, 'v) term list list" where
   "remove_ac_symbols [] = []" |
   "remove_ac_symbols (t # ts) = (case t of
                                 Fun f ss' \<Rightarrow> (case label f of
-                                              AC \<Rightarrow> (map get_args_ac ss') |
+                                              AC \<Rightarrow> (get_args_ac (Fun f ss'))#(remove_ac_symbols ts) |
                                               _ \<Rightarrow> [Fun f ss'] # (remove_ac_symbols ts)) |
                                 Var x \<Rightarrow> [Var x]#(remove_ac_symbols ts)
                                  )"
-  
 
 fun flatten_list :: "'a list list \<Rightarrow> 'a list" where (*Move*)
   "flatten_list [] = []" |
   "flatten_list (l # ls) = l @ (flatten_list ls)"
 
-fun flat_args_ac :: "('f, 'v) term \<Rightarrow> ('f, 'v) term list" where
-  "flat_args_ac (Var x) = []" |
-  "flat_args_ac (Fun f ts) = (case label f of
-                              AC \<Rightarrow> flatten_list (remove_ac_symbols ts) | 
-                              _ \<Rightarrow> ts)"
+
 
 fun real_flat :: "('f, 'v) term \<Rightarrow> ('f, 'v) term" where
-  "real_flat (Var x) = Var x" | 
-  "real_flat (Fun f ts) = Fun f (flat_args_ac (Fun f (map real_flat ts)))"
+  "real_flat (Var x) = Var x" |
+  "real_flat (Fun f ts) = (case label f of
+                              AC \<Rightarrow> Fun f (flatten_list (remove_ac_symbols ts)) | 
+                              _ \<Rightarrow> Fun f (map real_flat ts))"
+
+txt\<open>Some examples of the functions we defined above\<close>
+
+lemma example_1:
+  assumes "label f = AC"
+  shows "get_args_ac (Fun f [Fun f [Var x, Var y], Var z]) = [Fun f [Var x, Var y], Var z]"
+proof -
+  have "get_args_ac (Fun f [Fun f [Var x, Var y], Var z]) = (case Fun f [Fun f [Var x, Var y], Var z] of
+                                                            Fun f' ts' \<Rightarrow> (case label f' of  
+                                                                          AC \<Rightarrow> args (Fun f' ts') |
+                                                                          _ \<Rightarrow> [Fun f' ts']
+                                                                          ) |
+                                                             _ \<Rightarrow> [Fun f [Fun f [Var x, Var y], Var z]]
+                                                            )"
+    by simp
+  also have "... = (case label f of
+                    AC \<Rightarrow> args (Fun f [Fun f [Var x, Var y], Var z]) |
+                    _ \<Rightarrow> [Fun f [Fun f [Var x, Var y], Var z]]
+                    )"
+    by simp
+  also have "... = args (Fun f [Fun f [Var x, Var y], Var z])" by (simp add: assms)
+  also have "... = [Fun f [Var x, Var y], Var z]" by simp
+  finally show ?thesis by simp
+qed
+
+
+lemma example_2:
+  assumes "label f = AC"
+  shows "remove_ac_symbols [Fun f [Var x, Var y], Var z] = [[Var x, Var y], [Var z]]"
+proof -
+  have "remove_ac_symbols [Fun f [Var x, Var y], Var z] = (case Fun f [Var x, Var y] of 
+                                                          Fun f' ss' \<Rightarrow> (case label f' of
+                                                                        AC \<Rightarrow> (get_args_ac (Fun f' ss'))#(remove_ac_symbols [Var z]) |
+                                                                        _ \<Rightarrow> [Fun f' ss']#(remove_ac_symbols [Var z])) |
+                                                          Var v \<Rightarrow> [Var v]#(remove_ac_symbols [Var z])
+                                                           )" by simp
+  also have "... = (case label f of 
+                   AC \<Rightarrow> (get_args_ac (Fun f [Var x, Var y])) # (remove_ac_symbols [Var z]) |
+                   _ \<Rightarrow> [Fun f [Var x, Var y]] # (remove_ac_symbols [Var z])
+                   )" by simp
+  also have "... = (get_args_ac (Fun f [Var x, Var y])) # (remove_ac_symbols [Var z])" by (simp add: assms)
+  also have "... = [[Var x, Var y], [Var z]]" by (simp add: assms)
+  finally show ?thesis by simp
+qed
+
+lemma example_3: 
+  assumes "label f = AC"
+  shows "real_flat (Fun f [Fun f [Var x, Var y], Var z]) = Fun f [Var x, Var y, Var z]"
+  apply (simp add: assms)
+  done
+
+lemma example_4:
+  assumes "label f = AC"
+  shows "real_flat (Fun f [Fun f [Var x, Var y], Fun f [Var z, Fun g [Var w]]]) = 
+                      Fun f [Var x, Var y, Var z, Fun g [Var w]]"
+  apply (simp add: assms)
+  done
 
 
 
+  
+  
 
 (*fun real_flat_aux :: "('f, 'v) term \<Rightarrow> ('f, 'v) term list \<Rightarrow> ('f, 'v) term list" where
   "real_flat_aux t acc = 
@@ -159,7 +211,12 @@ fun real_flat :: "('f, 'v) term \<Rightarrow> ('f, 'v) term" where
       )"
 *)
 
-
+(*fun real_flat_1 :: "('f, 'v) term \<Rightarrow> ('f, 'v) term" where
+  "real_flat (Var x) = Var x" | 
+  "real_flat (Fun f ts) = (case label f of 
+                          AC \<Rightarrow> Fun f (flat_args_ac (Fun f (map real_flat ts))) |
+                          _ \<Rightarrow> Fun f (map real_flat ts)
+                          )" *)
 
 end
 
