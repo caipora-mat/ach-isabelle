@@ -130,8 +130,9 @@ fun flatten_list :: "'a list list \<Rightarrow> 'a list" where (*Move*)
 fun real_flat :: "('f, 'v) term \<Rightarrow> ('f, 'v) term" where
   "real_flat (Var x) = Var x" |
   "real_flat (Fun f ts) = (case label f of
-                              AC \<Rightarrow> Fun f (flatten_list (remove_ac_symbols ts)) | 
-                              _ \<Rightarrow> Fun f (map real_flat ts))"
+                          AC \<Rightarrow> Fun f (flatten_list (remove_ac_symbols (map real_flat ts))) |
+                          _ \<Rightarrow> Fun f (map real_flat ts)
+                          )"
 
 txt\<open>Some examples of the functions we defined above\<close>
 
@@ -185,11 +186,18 @@ lemma example_3:
 
 lemma example_4:
   assumes "label f = AC"
-  shows "real_flat (Fun f [Fun f [Var x, Var y], Fun f [Var z, Fun g [Var w]]]) = 
-                      Fun f [Var x, Var y, Var z, Fun g [Var w]]"
+  shows "real_flat (Fun f [Fun f [Var x, Var y], Fun f [Var z, Fun f [Var w, Var v]]]) = 
+                      Fun f [Var x, Var y, Var z, Var w, Var v]"
   apply (simp add: assms)
   done
 
+lemma example_5:
+  assumes "label f = AC"
+  and "label g = Unin"
+  shows "real_flat (Fun f [Fun f [Var x, Var y], Fun g [Var z, Fun f [Var w, Var v]]]) = 
+                      Fun f [Var x, Var y, Fun g [Var z, Fun f [Var w, Var v]]]"
+  apply (simp add: assms)
+  done
 
 
   
