@@ -11,6 +11,7 @@ begin
 
 
 
+
 datatype ach = Unin | AC | Hom
 
 value "vars_term (Var x)"
@@ -121,7 +122,7 @@ fun remove_ac_symbols :: "('f, 'v) term list \<Rightarrow> ('f, 'v) term list li
                                 Var x \<Rightarrow> [Var x]#(remove_ac_symbols ts)
                                  )"
 
-fun flatten_list :: "'a list list \<Rightarrow> 'a list" where (*Move*)
+fun flatten_list :: "'a list list \<Rightarrow> 'a list" where (*concat*)
   "flatten_list [] = []" |
   "flatten_list (l # ls) = l @ (flatten_list ls)"
 
@@ -134,7 +135,7 @@ fun real_flat :: "('f, 'v) term \<Rightarrow> ('f, 'v) term" where
                           _ \<Rightarrow> Fun f (map real_flat ts)
                           )"
 
-txt\<open>Some examples of the functions we defined above\<close>
+txt\<open>Some examples for the functions we defined above\<close>
 
 lemma example_1:
   assumes "label f = AC"
@@ -226,9 +227,66 @@ lemma example_5:
                           _ \<Rightarrow> Fun f (map real_flat ts)
                           )" *)
 
+
 end
 
 
+(*Funçao Fresh:
+fresh: 'v list \<Rightarrow> 'v
+
+
+'v é um semigrupo (operaçao ++)
+
+embedding: nat \<Rightarrow> 'v
+
+
+fresh_pseudo: 'v list \<Rightarrow> 'v
+1 - computar tamanho da lista |L| 
+2 - escolha alguem em 'v, seja x
+3 - Defina x_0 = x ++ embedding (|L| + 1)
+4 - Se x_0 não pertence a L
+     retorna x_0
+    Caso contrário
+     Defina x_1 = x ++ embedding (|L'| + 1)
+
+Provar que para toda lista L, a imagem de fresh_pseudo L não pertence a L.
+Criar um locale que assuma que exista embedding e que embedding é injetiva.
+Definir a funçao fresh a partir de fresh_pseudo.
+
+*)
+
+
+
+locale fresh = 
+  fixes variables :: "'v"
+    and embedding :: "nat \<Rightarrow> 'v"
+    and x :: 'v
+    and op :: "'v \<Rightarrow> 'v \<Rightarrow> 'v" (infixl \<open>\<star>\<close> 70)
+  assumes embed_inj: "inj embedding"
+    and op_semig : "x \<star> y \<star> z = x \<star> (y \<star> z)"
+
+
+begin
+
+
+
+function fresh_pseudo_aux :: "'v list \<Rightarrow> nat \<Rightarrow> 'v" where
+  "fresh_pseudo_aux L n = (if x \<star> (embedding n) \<notin> set L 
+                           then x \<star> (embedding n)
+                           else fresh_pseudo_aux L (Suc n)
+                           )"
+   apply (erule Product_Type.prod.exhaust)
+  apply simp
+  done
+
+definition fresh_pseudo :: "'v list \<Rightarrow> 'v" where
+  "fresh_pseudo L \<equiv> fresh_pseudo_aux L (Suc (length L))"
+
+definition fresh_pseudo2 :: "'v list \<Rightarrow> 'v" where
+  "fresh_pseudo2 L \<equiv> (SOME v. v \<notin> set L)"
+
+
+end
 
 
 
