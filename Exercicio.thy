@@ -277,7 +277,7 @@ function fresh_aux :: "'v list \<Rightarrow> nat \<Rightarrow> 'v" where
   done
 
 termination fresh_aux 
-  apply (relation "measure (\<lambda>(L, n). (length L)*(n) - (length L))")
+  apply (relation "measure (\<lambda>(L, n). (2* length L)^(n+2) - ((length L) + 1)^(n + 1))")
    apply auto
   sorry
 
