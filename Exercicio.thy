@@ -257,9 +257,8 @@ Definir a funçao fresh a partir de fresh_pseudo.
 
 
 
-locale fresh = 
-  fixes variables :: "'v"
-    and embedding :: "nat \<Rightarrow> 'v"
+locale name_freshness = 
+  fixes embedding :: "nat \<Rightarrow> 'v"
     and x :: 'v
     and op :: "'v \<Rightarrow> 'v \<Rightarrow> 'v" (infixl \<open>\<star>\<close> 70)
   assumes embed_inj: "inj embedding"
@@ -268,28 +267,116 @@ locale fresh =
 
 begin
 
-
-
-function fresh_pseudo_aux :: "'v list \<Rightarrow> nat \<Rightarrow> 'v" where
-  "fresh_pseudo_aux L n = (if x \<star> (embedding n) \<notin> set L 
+function fresh_aux :: "'v list \<Rightarrow> nat \<Rightarrow> 'v" where
+  "fresh_aux L n  = (if x \<star> (embedding n) \<notin> set L 
                            then x \<star> (embedding n)
-                           else fresh_pseudo_aux L (Suc n)
+                           else fresh_aux L (Suc n)
                            )"
-   apply (erule Product_Type.prod.exhaust)
+  apply (erule Product_Type.prod.exhaust)
   apply simp
   done
 
-definition fresh_pseudo :: "'v list \<Rightarrow> 'v" where
-  "fresh_pseudo L \<equiv> fresh_pseudo_aux L (Suc (length L))"
+termination fresh_aux 
+  apply (relation "measure (\<lambda>(L, n). (length L)*(n) - (length L))")
+   apply auto
+  sorry
 
-definition fresh_pseudo2 :: "'v list \<Rightarrow> 'v" where
-  "fresh_pseudo2 L \<equiv> (SOME v. v \<notin> set L)"
+fun fresh :: "'v list \<Rightarrow> 'v" where
+  "fresh L = fresh_aux L (length L)"
+
+
+
+fun fresh_aux2 :: "'v list \<Rightarrow> nat" where
+   "fresh_aux2 L = (LEAST n. x \<star> embedding n \<notin> set L)"
+
+fun fresh2 :: "'v list \<Rightarrow> 'v" where
+   "fresh2 L = x \<star> embedding (fresh_aux2 L)" 
+
+find_theorems 
+
+thm finite_set range_inj_infinite ex_new_if_finite
+thm inj_def
+
+lemma nome: "x \<star> embedding m = x \<star> embedding n \<Longrightarrow> m = n"
+  sorry
+
+ 
+
+
+lemma fresh_corr_aux : "\<exists> k. x \<star> embedding k \<notin> set L"
+proof-
+  have embed_infinite: "infinite (range embedding)"
+    using embed_inj range_inj_infinite by auto
+  have "inj (\<lambda> k. x \<star> embedding k)"
+    using nome inj_def by auto
+  then have "infinite (range (\<lambda> k. x \<star> embedding k))"
+     using range_inj_infinite by auto
+   finally show ?thesis
+   by (metis (mono_tags, lifting) List.finite_set \<open>infinite (range (\<lambda>k. x \<star> embedding k))\<close>
+       infinite_super rangeE subset_eq) (*used sledgehammer*)
+qed
+  
+
+thm LeastI_ex
+    
+
+
+lemma fresh_correctness :
+  fixes L :: "'v list"
+  shows "fresh2 L \<notin> set L"
+proof -
+  have "fresh2 L = x \<star> embedding (fresh_aux2 L)"
+    by simp
+  also have one: "... = x \<star> embedding (LEAST n. x \<star> embedding n \<notin> set L)"
+    by simp
+
+    let ?n = "(LEAST n. x \<star> embedding n \<notin> set L)"
+    have two: "x \<star> embedding ?n \<notin> set L"
+      apply (rule LeastI_ex)
+      apply (rule fresh_corr_aux)
+      done
+    show ?thesis using two by simp
+qed
+  
+    
+
 
 
 end
 
 
 
+interpretation v_nat : name_freshness 
+"id :: nat \<Rightarrow> nat"
+"0 :: nat"
+"(+) :: nat \<Rightarrow> nat \<Rightarrow> nat"
+  by unfold_locales auto
+
+
+abbreviation teste :: "nat list" where
+"teste \<equiv> [2,3]"
+
+value "v_nat.fresh_aux teste"
+
+term "v_nat.fresh teste"
+
+value "v_nat.fresh teste"
+
+
+(*function fresh_aux :: "'v list \<Rightarrow> nat \<Rightarrow> 'v" where
+  "fresh_aux L n  = (if x \<star> (embedding n) \<notin> set L 
+                           then x \<star> (embedding n)
+                           else fresh_aux L (Suc n)
+                           )"
+  apply (erule Product_Type.prod.exhaust)
+  apply simp
+  done
+
+termination fresh_aux 
+  apply (relation "measure (\<lambda>(L, n). length L - n - 1)")
+   apply auto
+  apply  ()
+ *)
 
 
 (*
