@@ -268,18 +268,22 @@ locale name_freshness =
 begin
 
 function fresh_aux :: "'v list \<Rightarrow> nat \<Rightarrow> 'v" where
-  "fresh_aux L n  = (if x \<star> (embedding n) \<notin> set L 
-                           then x \<star> (embedding n)
-                           else fresh_aux L (Suc n)
-                           )"
+  "fresh_aux L n  = (if x \<star> (embedding n) \<in> set L 
+                           then fresh_aux (remove1  (x \<star> (embedding n)) L) (Suc n)
+                           else  x \<star> (embedding n)
+                     )"
+                           
   apply (erule Product_Type.prod.exhaust)
   apply simp
   done
 
 termination fresh_aux 
-  apply (relation "measure (\<lambda>(L, n). (length L)*(n) - (length L))")
+  apply (relation "measure (\<lambda>(L, n). length L)")
    apply auto
-  sorry
+  by (metis Suc_diff_1 length_pos_if_in_set length_remove1 not_less_eq
+      verit_comp_simplify1(1))
+
+
 
 fun fresh :: "'v list \<Rightarrow> 'v" where
   "fresh L = fresh_aux L (length L)"
@@ -354,9 +358,9 @@ interpretation v_nat : name_freshness
 
 
 abbreviation teste :: "nat list" where
-"teste \<equiv> [2,3]"
+"teste \<equiv> [1,2]"
 
-value "v_nat.fresh_aux teste"
+value "v_nat.fresh_aux teste 0"
 
 term "v_nat.fresh teste"
 
