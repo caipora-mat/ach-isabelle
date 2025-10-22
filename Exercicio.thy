@@ -253,119 +253,66 @@ Provar que para toda lista L, a imagem de fresh_pseudo L não pertence a L.
 Criar um locale que assuma que exista embedding e que embedding é injetiva.
 Definir a funçao fresh a partir de fresh_pseudo.
 
+(* Note: I was trying to make this a single function, so it would become easier to use.
+However, it seems Isabelle doesn't accept recursive let-in bindings.
+Or I don't know the notation for it (in ML it is let rec, i tried let rec, let primerec, and so on)
+TODO: certify that this is indeed the case.
+fun fresh :: "'v list \<Rightarrow> 'v" where
+"fresh l = (
+  let rec f = \<lambda> l n .
+  (
+    let name_candidate = init \<star> (embedding n) in
+    if name_candidate \<in> set l then
+      f (removeAll name_candidate l) (Suc n)
+    else
+      name_candidate
+  )
+  in init)" *)
+
 *)
-
-
 
 locale name_freshness = 
   fixes embedding :: "nat \<Rightarrow> 'v"
-    and x :: 'v
-    and op :: "'v \<Rightarrow> 'v \<Rightarrow> 'v" (infixl \<open>\<star>\<close> 70)
+    and init :: 'v
+    and concat :: "'v \<Rightarrow> 'v \<Rightarrow> 'v" (infixl \<open>\<star>\<close> 70)
   assumes embed_inj: "inj embedding"
-    and op_semig : "x \<star> y \<star> z = x \<star> (y \<star> z)"
-
+    and op_semig : "(x \<star> y) \<star> z = x \<star> (y \<star> z)"
 
 begin
 
-function fresh_aux :: "'v list \<Rightarrow> nat \<Rightarrow> 'v" where
-  "fresh_aux L n  = (if x \<star> (embedding n) \<in> set L 
-                           then fresh_aux (remove1  (x \<star> (embedding n)) L) (Suc n)
-                           else  x \<star> (embedding n)
-                     )"
-                           
-  apply (erule Product_Type.prod.exhaust)
-  apply simp
-  done
+fun fresh_aux :: "'v list \<Rightarrow> nat \<Rightarrow> 'v" where
+  "fresh_aux l n = (
+    let name = init \<star> (embedding n) in
+    if name \<in> set l then
+      fresh_aux (removeAll name l) (Suc n)
+    else
+      name
+  )"
 
-termination fresh_aux 
-  apply (relation "measure (\<lambda>(L, n). length L)")
-   apply auto
-  by (metis Suc_diff_1 length_pos_if_in_set length_remove1 not_less_eq
-      verit_comp_simplify1(1))
-
-
-
-fun fresh :: "'v list \<Rightarrow> 'v" where
-  "fresh L = fresh_aux L (length L)"
-
-
-
-fun fresh_aux2 :: "'v list \<Rightarrow> nat" where
-   "fresh_aux2 L = (LEAST n. x \<star> embedding n \<notin> set L)"
-
-fun fresh2 :: "'v list \<Rightarrow> 'v" where
-   "fresh2 L = x \<star> embedding (fresh_aux2 L)" 
-
-find_theorems 
-
-thm finite_set range_inj_infinite ex_new_if_finite
-thm inj_def
-
-lemma nome: "x \<star> embedding m = x \<star> embedding n \<Longrightarrow> m = n"
+lemma fresh_aux_sound : "\<forall> l n. fresh_aux l n \<notin> set l"
   sorry
 
- 
+fun fresh :: "'v list \<Rightarrow> 'v" where
+  "fresh l = fresh_aux l 0"
 
 
-lemma fresh_corr_aux : "\<exists> k. x \<star> embedding k \<notin> set L"
-proof-
-  have embed_infinite: "infinite (range embedding)"
-    using embed_inj range_inj_infinite by auto
-  have "inj (\<lambda> k. x \<star> embedding k)"
-    using nome inj_def by auto
-  then have "infinite (range (\<lambda> k. x \<star> embedding k))"
-     using range_inj_infinite by auto
-   finally show ?thesis
-   by (metis (mono_tags, lifting) List.finite_set \<open>infinite (range (\<lambda>k. x \<star> embedding k))\<close>
-       infinite_super rangeE subset_eq) (*used sledgehammer*)
-qed
-  
 
-thm LeastI_ex
-    
-
-
-lemma fresh_correctness :
-  fixes L :: "'v list"
-  shows "fresh2 L \<notin> set L"
-proof -
-  have "fresh2 L = x \<star> embedding (fresh_aux2 L)"
-    by simp
-  also have one: "... = x \<star> embedding (LEAST n. x \<star> embedding n \<notin> set L)"
-    by simp
-
-    let ?n = "(LEAST n. x \<star> embedding n \<notin> set L)"
-    have two: "x \<star> embedding ?n \<notin> set L"
-      apply (rule LeastI_ex)
-      apply (rule fresh_corr_aux)
-      done
-    show ?thesis using two by simp
-qed
-  
-    
-
-
+lemma fresh_sound : "\<forall> l. fresh l \<notin> set l"
+  sorry
 
 end
 
+(* Try reading: https://isabelle.in.tum.de/website-Isabelle2025/dist/Isabelle2025/doc/codegen.pdf
+on section 9.5, "Locales and Interpretation".
+Code equations seems to be a form of a lemma, but i couldn't add them directly yet.
+*)
 
+global_interpretation nat_names : name_freshness "\<lambda> n . n " "0" "(+)"
+  defines fresh_aux = name_freshness.fresh_aux and fresh = name_freshness.fresh
+  by unfold_locales
+    (auto)
 
-interpretation v_nat : name_freshness 
-"id :: nat \<Rightarrow> nat"
-"0 :: nat"
-"(+) :: nat \<Rightarrow> nat \<Rightarrow> nat"
-  by unfold_locales auto
-
-
-abbreviation teste :: "nat list" where
-"teste \<equiv> [1,2]"
-
-value "v_nat.fresh_aux teste 0"
-
-term "v_nat.fresh teste"
-
-value "v_nat.fresh teste"
-
+value "nat_names.fresh [1,2]"
 
 (*function fresh_aux :: "'v list \<Rightarrow> nat \<Rightarrow> 'v" where
   "fresh_aux L n  = (if x \<star> (embedding n) \<notin> set L 
