@@ -9,18 +9,17 @@ theory Exercicio
 
 begin
 
-
-
-
-datatype ach = Unin | AC | Hom
-
-value "vars_term (Var x)"
-value "vars_term (Fun f [Var x, Var y])"
-
-
-value "args (Fun f [Var x, Var y])"
+definition is_fake_flattened :: "('f, 'v) equation \<Rightarrow> bool" 
+  where "is_fake_flattened eq \<longleftrightarrow> (case eq of 
+  (Var _, Var _) \<Rightarrow>  True | 
+  (Var _ , Fun _ ts) \<Rightarrow> (\<forall> t \<in> set ts. is_Var t) |
+  (Fun _ ts, Var _) \<Rightarrow> (\<forall> t \<in> set ts. is_Var t)|
+  _ \<Rightarrow> False)"
 
 type_synonym ('f, 'v) problem = "('f, 'v) equation list"
+
+definition fake_flattened_problem :: "('f, 'v) equations \<Rightarrow> bool" where
+"fake_flattened_problem \<Gamma> \<longleftrightarrow> (\<forall> eq \<in> \<Gamma>. is_fake_flattened eq)"
 
 definition vars_eq :: "('f, 'v) equation \<Rightarrow> 'v set" 
   where "vars_eq e \<equiv> let (s, t) = e in vars_term s \<union> vars_term t"
@@ -32,12 +31,7 @@ definition new_var :: "('f, nat) problem \<Rightarrow> nat"
   where "new_var \<Gamma> \<equiv> Max (vars_eqs \<Gamma>) + 1"
 
 
-definition is_flattened :: "('f, 'v) equation \<Rightarrow> bool" 
-  where "is_flattened eq \<longleftrightarrow> (case eq of 
-  (Var _, Var _) \<Rightarrow>  True | 
-  (Var _ , Fun _ ts) \<Rightarrow> (\<forall> t \<in> set ts. is_Var t) |
-  (Fun _ ts, Var _) \<Rightarrow> (\<forall> t \<in> set ts. is_Var t)|
-  _ \<Rightarrow> False)"
+
 
 (*
 +[s1, ..., sn] tal que s1,..., sn nao tem ocorrencias de +
@@ -72,8 +66,7 @@ real_flat Fun + t1#ts \<Rightarrow> (if t1 = Fun + ts' then
 
 *)
 
-definition flattened_problem :: "('f, 'v) equations \<Rightarrow> bool" where
-"flattened_problem \<Gamma> \<longleftrightarrow> (\<forall> eq \<in> \<Gamma>. is_flattened eq)"
+
 
 fun fbs:: "('f, nat) problem \<Rightarrow> ('f, nat) problem" where
   "fbs [] = []" |
@@ -89,6 +82,8 @@ lemma fbs_correctness: "(ListMem (t1, t2) (fbs(\<Gamma>))) \<Longrightarrow> (is
   sorry
 
 
+datatype ach = Unin | AC | Hom
+
 locale signature = 
   fixes arity :: "'f \<Rightarrow> nat"
     and label :: "'f \<Rightarrow> ach"
@@ -96,12 +91,6 @@ locale signature =
 
 
 begin
-
-fun h_height:: "('f, 'v) term \<Rightarrow> nat" where (*Move*)
-"h_height (Var x) = 0"|
-"h_height (Fun f ts) = (if (label f = Hom) then
-    (1 + foldl max 0 (map h_height ts))
-    else foldl max 0 (map h_height ts))"
 
 fun get_args_ac:: "('f, 'v) term \<Rightarrow> ('f, 'v) term list" where
   "get_args_ac t = (case t of 
@@ -117,7 +106,7 @@ fun remove_ac_symbols :: "('f, 'v) term list \<Rightarrow> ('f, 'v) term list li
   "remove_ac_symbols [] = []" |
   "remove_ac_symbols (t # ts) = (case t of
                                 Fun f ss' \<Rightarrow> (case label f of
-                                              AC \<Rightarrow> (get_args_ac (Fun f ss'))#(remove_ac_symbols ts) |
+                                              AC \<Rightarrow> (get_args_ac (Fun f ss'))#(remove_ac_symbols ts)|
                                               _ \<Rightarrow> [Fun f ss'] # (remove_ac_symbols ts)) |
                                 Var x \<Rightarrow> [Var x]#(remove_ac_symbols ts)
                                  )"
@@ -200,7 +189,11 @@ lemma example_5:
   apply (simp add: assms)
   done
 
-
+fun h_height:: "('f, 'v) term \<Rightarrow> nat" where (*Move*)
+"h_height (Var x) = 0"|
+"h_height (Fun f ts) = (if (label f = Hom) then
+    (1 + foldl max 0 (map h_height ts))
+    else foldl max 0 (map h_height ts))"
   
   
 
@@ -289,16 +282,27 @@ fun fresh_aux :: "'v list \<Rightarrow> nat \<Rightarrow> 'v" where
       name
   )"
 
+print_theorems
+
+find_theorems 
+
 lemma fresh_aux_sound : "\<forall> l n. fresh_aux l n \<notin> set l"
-  sorry
+proof(induct rule: fresh_aux.induct)
+  case (1 l n)
+  let ?name = "init \<star> embedding n"
+  then show ?case sorry
+
+    
+qed
+
+
 
 fun fresh :: "'v list \<Rightarrow> 'v" where
   "fresh l = fresh_aux l 0"
 
 
-
 lemma fresh_sound : "\<forall> l. fresh l \<notin> set l"
-  sorry
+  using fresh_aux_sound by simp 
 
 end
 
