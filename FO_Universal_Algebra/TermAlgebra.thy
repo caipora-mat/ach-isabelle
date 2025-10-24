@@ -88,5 +88,13 @@ locale lab_sig =
   fixes label :: "'f \<Rightarrow> 'l"
   assumes inj_label : \<open>inj label\<close>
 
+text \<open>Extending a locale such that the extension is aware of the type variables.\<close>
 
+locale loc_a =
+  fixes f :: \<open>'v list \<Rightarrow> 'v\<close>
+
+locale extend_a = 
+  loc_a f
+  for f :: \<open>'v list \<Rightarrow> 'v\<close> +
+  fixes g :: \<open>'v list\<close>
 end
