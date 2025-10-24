@@ -293,15 +293,11 @@ locale name_freshness = name_freshness_defs +
 
 begin
 
+  lemma inc_test : "\<forall> l. fresh l \<notin> set [init]"
+    sorry
 
-
-
-
-lemma inc_test : "\<forall> l. fresh l \<notin> set [init]"
-  sorry
-
-lemma fresh_aux_sound : "\<forall> l n. fresh_aux l n \<notin> set l"
-  sorry
+  lemma fresh_aux_sound : "\<forall> l n. fresh_aux l n \<notin> set l"
+    sorry
 (*
 I commented this because it was producing an error.
 proof(induct rule: fresh_aux.induct)
@@ -318,12 +314,10 @@ lemma fresh_soulemma fresh_sound : "\<forall> l. fresh l \<notin> set l"
 
 end
 
-
-
 (*
 Try reading:
   https://isabelle.in.tum.de/website-Isabelle2025/dist/Isabelle2025/doc/codegen.pdf
-on section 9.5, "Locales and Interpretation".
+on Section 9.5, "Locales and Interpretation".
 Code equations seems to be a form of a lemma, but i couldn't add them directly yet.
 *)
 
@@ -331,7 +325,7 @@ global_interpretation nat_names : name_freshness "\<lambda> n . n" "0" "(+)"
   defines fresh_aux = name_freshness_defs.fresh_aux and fresh = name_freshness_defs.fresh
   by unfold_locales (auto)
 
-value "nat_names.fresh [1,2]"
+value "name_freshness_defs.fresh_aux (\<lambda> n. n) 0 (+) [0, 1, 2] 0" (* Aha! Now it computes! *)
 
 (*function fresh_aux :: "'v list \<Rightarrow> nat \<Rightarrow> 'v" where
   "fresh_aux L n  = (if x \<star> (embedding n) \<notin> set L 
