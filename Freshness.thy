@@ -30,15 +30,23 @@ declare name_freshness_defs.fresh.simps[code]
 locale name_freshness = name_freshness_defs +
   assumes embed_inj: "inj embedding"
   and op_semig : "(x \<star> y) \<star> z = x \<star> (y \<star> z)"
-  and init_not_null : "\<forall> x. (init \<noteq> x \<longrightarrow> init \<star> x \<noteq> init)"
+  (* and init_not_null : "\<forall> x. (init \<noteq> x \<longrightarrow> init \<star> x \<noteq> init)" *)
+  and is_cancelatiovo : \<open>x \<star> y = x \<star> z \<longrightarrow> y = z\<close>
 
 begin
+
+lemma maluco : \<open>\<forall> n. inj (\<lambda> n. init \<star> (embedding n))\<close>
+  using is_cancelatiovo embed_inj inj_def
+  by meson
 
   (*lemma inc_test : "\<forall> l. fresh l \<notin> set [init]"
     sorry*)
 
 find_theorems abs
 thm "finite_set"
+
+lemma fresh_exist : \<open>\<forall> l n. \<exists> x. fresh_aux l n = init \<star> (embedding x)\<close>
+  sorry
 
 
 
@@ -61,10 +69,10 @@ thm "finite_set"
 
 end
 
-global_interpretation nat_names : name_freshness "\<lambda> n . n" "1" "(*)"
-  by unfold_locales (auto)
+global_interpretation nat_names : name_freshness "\<lambda> n . n" "0" "(+)"
+  by unfold_locales auto
 
-value "nat_names.fresh_aux [1] 0"
+value "nat_names.fresh [0,1]"
 
 value "name_freshness_defs.fresh (\<lambda> n. n) 0 (+) [0, 1, 2]" (* Aha! Now it computes! *)
 
