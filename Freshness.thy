@@ -54,11 +54,11 @@ lemma fresh_soulemma fresh_sound : "\<forall> l. fresh l \<notin> set l"
 
 end
 
-global_interpretation nat_names : name_freshness "\<lambda> n . n" "0" "(+)"
-  defines fresh_aux = name_freshness_defs.fresh_aux and fresh = name_freshness_defs.fresh
+global_interpretation nat_names : name_freshness "\<lambda> n . n" "2" "(*)"
   by unfold_locales (auto)
 
-value "name_freshness_defs.fresh_aux (\<lambda> n. n) 0 (+) [0, 1, 2] 0" (* Aha! Now it computes! *)
+value "nat_names.fresh [0,1,2]"
 
+value "name_freshness_defs.fresh (\<lambda> n. n) 0 (+) [0, 1, 2]" (* Aha! Now it computes! *)
 
 end
