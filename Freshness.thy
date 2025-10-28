@@ -30,27 +30,34 @@ declare name_freshness_defs.fresh.simps[code]
 locale name_freshness = name_freshness_defs +
   assumes embed_inj: "inj embedding"
   and op_semig : "(x \<star> y) \<star> z = x \<star> (y \<star> z)"
+  and init_not_null : "\<forall> x. init \<star> x \<noteq> init"
 
 begin
 
-  lemma inc_test : "\<forall> l. fresh l \<notin> set [init]"
-    sorry
+  (*lemma inc_test : "\<forall> l. fresh l \<notin> set [init]"
+    sorry*)
 
-  lemma fresh_aux_sound : "\<forall> l n. fresh_aux l n \<notin> set l"
-    sorry
-(*
-I commented this because it was producing an error.
-proof(induct rule: fresh_aux.induct)
+find_theorems abs
+thm "finite_set"
 
-  case (1 l n)
-  let ?name = "init \<star> embedding n"
-  then show ?case sorry
-*)
-(*
-lemma fresh_soulemma fresh_sound : "\<forall> l. fresh l \<notin> set l"
-  using fresh_aux_sound by simp nd : "\<forall> l. fresh l \<notin> set l"
-  using fresh_aux_sound by simp 
-*)
+
+
+  lemma fresh_aux_sound : "fresh_aux l n \<notin> set l"
+    proof(cases "init \<star> embedding n \<in> set l")
+      case True
+      then show ?thesis
+        sorry
+    next
+      case False
+      then show ?thesis 
+        using fresh_aux.simps by simp
+    qed
+    
+
+
+  lemma fresh_sound : "\<forall> l. fresh l \<notin> set l"
+    using fresh_aux_sound by simp
+
 
 end
 
