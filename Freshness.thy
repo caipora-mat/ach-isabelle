@@ -74,7 +74,7 @@ proof (induction "length l" arbitrary: n l k rule: less_induct)
   then show ?case
   proof (cases "init \<star> embedding n \<in> set l")
     case False
-    then have "fresh_aux l n = init \<star> embedding n" by (simp add: fresh_aux.simps)
+    then have "fresh_aux l n = init \<star> embedding n" by simp
     then show ?thesis using \<open>fresh_aux l n = init \<star> embedding k\<close> less.prems init_embed_inj inj_def order_refl 
       by metis
   next
