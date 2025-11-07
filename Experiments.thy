@@ -3,7 +3,7 @@ Author: Guilherme Borges Brandão <borgesbrandao13@gmail.com>
 Author: Daniele Nantes Sobrinho <d.nantes-sobrinho@imperial.ac.uk>
 *)
 
-theory Exercicio
+theory Experiments
   imports Main
   "First_Order_Terms.Unification"
 
