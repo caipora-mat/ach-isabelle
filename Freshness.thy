@@ -1,3 +1,9 @@
+(*
+Author: Guilherme Borges Brandão <borgesbrandao13@gmail.com>
+Author: Daniele Nantes Sobrinho <d.nantes-sobrinho@imperial.ac.uk>
+Author: Deivid Vale <email-here>
+*)
+
 theory Freshness
 
 imports Main
