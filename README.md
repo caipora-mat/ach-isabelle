@@ -9,8 +9,11 @@ The folder "FO_Universal_Algebra" just contains some testing of instantiation of
 
 # To-Do
 [] Define the variable abstracting rules;
+
 [] Create a separate file for the Variable Abstracting procedure with its soundness proof;
+
 [] Separate the file that works with ACh Terms and the flattening of an AC application;
+
 [] Define the rules for the bounded ACh-unification algorithm;
 
 ## Useful links
