@@ -37,7 +37,6 @@ declare name_freshness_defs.fresh.simps[code]
 locale name_freshness = name_freshness_defs +
   assumes embed_inj: "inj embedding"
   and op_semig : "(x \<star> y) \<star> z = x \<star> (y \<star> z)"
-  (* and init_not_null : "\<forall> x. (init \<noteq> x \<longrightarrow> init \<star> x \<noteq> init)" *)
   and is_cancelative : \<open>x \<star> y = x \<star> z \<longrightarrow> y = z\<close>
 
 begin
@@ -143,7 +142,6 @@ proof (induction "length l" arbitrary: n l rule: less_induct)
   qed
 qed
  
-
 
 lemma fresh_sound : "\<forall> l. fresh l \<notin> set l"
   using fresh_aux_sound by simp
