@@ -41,6 +41,14 @@ fun equal :: "('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow> bool" wher
                   )"
 
 
+text \<open>Equality modulo ACh: 
+(x \<oplus> y) \<oplus> z = x \<oplus> (y \<oplus> z),
+ x \<oplus> y = y \<oplus> x,
+h(x) \<oplus> h(y) = h(x \<oplus> y)
+1. First define equality modulo AC
+2. Use orient homomorfism into Rh ={h(x) \<oplus> h(y) \<rightarrow> h(x \<oplus> y)}
+3. s =_{ACh} t \<Leftrightarrow> s\<down> =_{AC} t\<down>  \<close>
+
 end
 
 
