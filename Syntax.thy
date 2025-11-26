@@ -75,6 +75,9 @@ fun dec_is_flatten_aux :: \<open>('f, 'v) term \<Rightarrow> bool \<Rightarrow> 
 fun dec_is_flatten :: \<open>('f, 'v) term \<Rightarrow> bool\<close> where
   \<open>dec_is_flatten t = dec_is_flatten_aux t False\<close>
 
+lemma dec_pred_is_flatten: \<open>IsFlattened t \<longleftrightarrow> dec_is_flatten t\<close>
+  sorry
+
 (* TODO: prove this is sound and connect it with the predicate. *)
 
 end
