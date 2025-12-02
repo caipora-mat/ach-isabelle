@@ -140,7 +140,9 @@ lemma example_5:
 
 
 
-
+text \<open> we need:
+lemma 1:  IsFlattened(flat t)
+lemma 2: \<forall> t. t=_{AC} flat(t)\<close>
 
 
 (*End of flat*)

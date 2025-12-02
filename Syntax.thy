@@ -15,7 +15,7 @@ begin
 
 (* baby lemmas about labels *)
 lemma non_ac : \<open>label f \<noteq> AC \<Longrightarrow> label f = Unin \<or> label f = Hom\<close>
-  sorry
+  using ach.exhaust by blast
 
 
 (* Collets all function symbols occuring in a term. *)
@@ -55,6 +55,15 @@ inductive IsFlattened :: \<open>('f, 'v) term \<Rightarrow> bool\<close> where
   \<open>\<lbrakk>label f = AC; t \<in> set ts; g \<in> set (get_all_symbols t) \<and> g \<notin> set (get_all_ACs t)\<rbrakk>
       \<Longrightarrow> IsFlattened (Fun f ts)\<close>
 
+text \<open> I think the definition of acIsFlattened is too strong, for example 
++(x, g(+(y,z),x) is flattened and it seems that the function does not agree with it.\<close>
+
+lemma example2:
+  assumes "label f = AC" and "label g = Unin"
+  shows "IsFlattened (Fun f [Var x, Fun g [Fun f [Var y, Var x], Var x]])"
+  apply (rule acIsFlattened)
+    apply (simp add: assms(1))
+  sorry
 
 (* Now we define a function that decides the above predicate *)
 
