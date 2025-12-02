@@ -47,7 +47,7 @@ inductive eq_ac:: \<open>('v, 'f) term \<Rightarrow> ('v, 'f) term \<Rightarrow>
           length ts > 0 ;
           length ts = length gs ;
           \<exists> j. (
-            ts!1 = gs!j \<and>
+            eq_ac (ts!1) (gs!j) \<and>
             eq_ac (Fun f (remove1 (ts!1) ts)) (Fun f (remove1 (ts!i) ts))
           )
           \<rbrakk> \<Longrightarrow> eq_ac (Fun f ts) (Fun f gs)\<close>
