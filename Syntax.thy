@@ -17,25 +17,6 @@ begin
 lemma non_ac : \<open>label f \<noteq> AC \<Longrightarrow> label f = Unin \<or> label f = Hom\<close>
   using ach.exhaust by blast
 
-
-(* Collets all function symbols occuring in a term. *)
-fun get_all_symbols :: "('f, 'v) term \<Rightarrow> 'f list" where
-  \<open>get_all_symbols s =
-    (case s of
-      Var _ \<Rightarrow> [] |
-      Fun f ss \<Rightarrow> f # (concat (map get_all_symbols ss))
-    )\<close>
-
-(* Collects all AC symbols occurring in a term function. *)
-fun get_all_ACs :: "('f, 'v) term \<Rightarrow> 'f list" where
-  \<open>get_all_ACs (Var x) = []\<close> |
-  \<open>get_all_ACs (Fun f ss) =
-    (case (label f) of
-      AC \<Rightarrow> f # (concat (map get_all_ACs ss)) |
-      _  \<Rightarrow> concat (map get_all_ACs ss)
-    )\<close>
-
-
 section \<open>Flattened Terms\<close>
 
 text \<open>\<close>
@@ -55,33 +36,6 @@ inductive IsFlattened :: \<open>('f, 'v) term \<Rightarrow> bool\<close> where
   \<open>\<lbrakk>label f = AC; t \<in> set ts;  t = Fun g tss; label g \<noteq> AC \<rbrakk>
       \<Longrightarrow> IsFlattened (Fun f ts)\<close>
 
-
-fun dec_IsFlattened :: \<open>('f, 'v) term \<Rightarrow> bool\<close> where
-  \<open>dec_IsFlattened (Var _) = True\<close> |
-  \<open>dec_IsFlattened (Fun f ts) =
-    (case label f of
-      AC \<Rightarrow> (
-        let P =
-          \<lambda> s. (case s of
-                  (Var _)   \<Rightarrow> False |
-                  (Fun g _) \<Rightarrow> (case label g of AC \<Rightarrow> True | _ \<Rightarrow> False)
-        ) in
-        let ac_arg = find P ts in
-        (case ac_arg of
-          None \<Rightarrow> True |
-          Some _ \<Rightarrow> False)
-      )|
-      _  \<Rightarrow> foldl (\<and>) True (map dec_IsFlattened ts)
-    )\<close>
-
-
-
-text \<open> I think the definition of acIsFlattened is too strong, for example
-+(x, g(+(y,z),x)) is flattened and it seems that the function does not agree with it.
- \<open>\<lbrakk>label f = AC; t \<in> set ts; t = Fun g tss \<Longrightarrow> label g \<noteq> AC\<rbrakk>
-      \<Longrightarrow> IsFlattened (Fun f ts)\<close>
-\<close>
-
 value  "set [Var x, Fun g [Fun f [Var y, Var x], Var x]]"
 
 lemma example2:
@@ -95,6 +49,32 @@ lemma example2:
   done
 
 (* Now we define a function that decides the above predicate *)
+
+fun dec_IsFlattened :: \<open>('f, 'v) term \<Rightarrow> bool\<close> where
+  \<open>dec_IsFlattened (Var _) = True\<close> |
+  \<open>dec_IsFlattened (Fun f ts) =
+    (case label f of
+      AC \<Rightarrow> (
+        let is_headed_by_ac =
+          \<lambda> s. (case s of
+                  (Var _)   \<Rightarrow> False |
+                  (Fun g _) \<Rightarrow> (case label g of AC \<Rightarrow> True | _ \<Rightarrow> False)
+        ) in
+        let ac_arg = find is_headed_by_ac ts in
+        (case ac_arg of
+          None \<Rightarrow> True |
+          Some _ \<Rightarrow> False)
+      )|
+      _  \<Rightarrow> foldl (\<and>) True (map dec_IsFlattened ts)
+    )\<close>
+
+lemma dec_pred_is_flatten: \<open>\<forall>s. IsFlattened s \<longleftrightarrow> dec_IsFlattened s\<close>
+  sorry
+
+(*
+
+This function is too complicated, the implementation above is simpler.
+Leaving the old one here to compare. Deleate it on next commit.
 
 fun dec_is_flatten_aux :: \<open>('f, 'v) term \<Rightarrow> bool \<Rightarrow> bool\<close> where
   (* \<open>dec_is_flatten_aux (Var _) True = False\<close>  | *)
@@ -113,15 +93,9 @@ fun dec_is_flatten_aux :: \<open>('f, 'v) term \<Rightarrow> bool \<Rightarrow> 
 fun dec_is_flatten :: \<open>('f, 'v) term \<Rightarrow> bool\<close> where
   \<open>dec_is_flatten t = dec_is_flatten_aux t False\<close>
 
-
-lemma dec_pred_is_flatten: \<open>IsFlattened t \<longleftrightarrow> dec_is_flatten t\<close>
-  sorry
+*)
 
 text \<open>We define a function that flattens a term\<close>
 
-(* TODO: prove this is sound and connect it with the predicate. *)
-
 end
-
-
 end
