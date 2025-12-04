@@ -5,34 +5,8 @@ imports Main "First_Order_Terms.Term" "Syntax"
 begin
 
 context signature
+
 begin
-
-(*
-Inductive definition of the relation =AC.
-
-                      \<forall>i. t_i  =AC s_i   label f \<noteq> AC
-      --------------------------------------------------------
-                   f(t1,...tn) =AC f(s1, ..., sn)
-
-      \<exists> j. t1 =AC s_j    f(t_2, ..., tn) =AC f(s1, ..., s_{j-1},s_{j+1} ..., s_n)
-      -----------------------------------------------------------------------------------------
-                  f(t1,...tn) =AC f(s1, ..., sn)
-
-
-
-espirito de porco?
-
-1. x + y = x + y + y
-
-
-*)
-
-(* 
-  1. define proj em lista
-  
-
-
-*)
 
 inductive eq_ac:: \<open>('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow> bool\<close> where
   ac_refl: \<open>eq_ac t t\<close> |
@@ -61,13 +35,11 @@ inductive eq_ac:: \<open>('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow>
                             \<Longrightarrow> x =AC x \<and> y =AC y \<and> [z] = [w]
                             \<Longrightarrow> False
 
-E = { x + y = y + x ; (x + y) + z = x + (y + z) }
+  E = { x + y = y + x ; (x + y) + z = x + (y + z) }
 
  \<approx>_E
-
-  T(\<Sigma>,X) / \<approx>E (this is an intial algebra)
-
-  Soundness for my unification:
+   
+  T(\<Sigma>,X) / \<approx>E (this is an initial algebra)
 
   if unif_ac(s,t) = \<sigma>, then s \<cdot> \<sigma> =AC t \<cdot> \<sigma> (syntactic soundness)
   
