@@ -47,6 +47,26 @@ inductive IsFlattened :: \<open>('f, 'v) term \<Rightarrow> bool\<close> where
   \<open>\<lbrakk>label f = AC; t \<in> set ts; g \<in> set (get_all_symbols t) \<and> g \<notin> set (get_all_ACs t)\<rbrakk>
       \<Longrightarrow> IsFlattened (Fun f ts)\<close>
 
+
+fun dec_IsFlattened :: \<open>('f, 'v) term \<Rightarrow> bool\<close> where
+  \<open>dec_IsFlattened (Var _) = True\<close> |
+  \<open>dec_IsFlattened (Fun f ts) = 
+    (case label f of
+      AC \<Rightarrow> (
+        let P =
+          \<lambda> s. (case s of
+                  (Var _)   \<Rightarrow> False |
+                  (Fun g _) \<Rightarrow> (case label g of AC \<Rightarrow> True | _ \<Rightarrow> False)
+        ) in
+        let ac_arg = find P ts in
+        (case ac_arg of
+          None \<Rightarrow> True |
+          Some _ \<Rightarrow> False)
+      )|
+      _  \<Rightarrow> foldl (\<and>) True (map dec_IsFlattened ts)
+    )\<close>
+
+
 text \<open> I think the definition of acIsFlattened is too strong, for example 
 +(x, g(+(y,z),x) is flattened and it seems that the function does not agree with it.\<close>
 
