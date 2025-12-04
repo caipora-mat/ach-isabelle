@@ -9,16 +9,12 @@ datatype ach = Unin | AC | Hom
 locale signature = 
   fixes arity :: "'f \<Rightarrow> nat"
     and label :: "'f \<Rightarrow> ach"
-  assumes label_inj: "inj label"
 
 begin
 
-(* baby lemmas about labels *)
 lemma non_ac : \<open>label f \<noteq> AC \<Longrightarrow> label f = Unin \<or> label f = Hom\<close>
   using ach.exhaust by blast
 
-
-(* Collets all function symbols occuring in a term. *)
 fun get_all_symbols :: "('f, 'v) term \<Rightarrow> 'f list" where
   \<open>get_all_symbols s = 
     (case s of
@@ -26,7 +22,6 @@ fun get_all_symbols :: "('f, 'v) term \<Rightarrow> 'f list" where
       Fun f ss \<Rightarrow> f # (concat (map get_all_symbols ss))
     )\<close>
 
-(* Collects all AC symbols occurring in a term function. *)
 fun get_all_ACs :: "('f, 'v) term \<Rightarrow> 'f list" where
   \<open>get_all_ACs (Var x) = []\<close> |
   \<open>get_all_ACs (Fun f ss) =
@@ -35,10 +30,7 @@ fun get_all_ACs :: "('f, 'v) term \<Rightarrow> 'f list" where
       _  \<Rightarrow> concat (map get_all_ACs ss)
     )\<close>
 
-
 section \<open>Flattened Terms\<close>
-
-text \<open>\<close>
 
 inductive IsFlattened :: \<open>('f, 'v) term \<Rightarrow> bool\<close> where
   (* Every variable term is flattened *)
@@ -68,12 +60,11 @@ lemma example2:
 (* Now we define a function that decides the above predicate *)
 
 fun dec_is_flatten_aux :: \<open>('f, 'v) term \<Rightarrow> bool \<Rightarrow> bool\<close> where
-  (* \<open>dec_is_flatten_aux (Var _) True = False\<close>  | *)
-  \<open>dec_is_flatten_aux (Var _) _ = True\<close>   |
+  \<open>dec_is_flatten_aux (Var _) _ = True\<close> |
   \<open>dec_is_flatten_aux (Fun f ts) False =
-    (case (label f) of
-      AC \<Rightarrow> foldl (\<and>) True (map (\<lambda> t. dec_is_flatten_aux t True) ts)|
-      _ \<Rightarrow>  foldl (\<and>) True (map (\<lambda> t. dec_is_flatten_aux t False) ts)
+    (case label f of
+      AC \<Rightarrow> foldl (\<and>) True (map (\<lambda> t. dec_is_flatten_aux t True)  ts) |
+      _  \<Rightarrow> foldl (\<and>) True (map (\<lambda> t. dec_is_flatten_aux t False) ts)
     )\<close> |
   \<open>dec_is_flatten_aux (Fun f ts) True =
     (case (label f) of
@@ -87,9 +78,5 @@ fun dec_is_flatten :: \<open>('f, 'v) term \<Rightarrow> bool\<close> where
 lemma dec_pred_is_flatten: \<open>IsFlattened t \<longleftrightarrow> dec_is_flatten t\<close>
   sorry
 
-(* TODO: prove this is sound and connect it with the predicate. *)
-
 end
-
-
 end

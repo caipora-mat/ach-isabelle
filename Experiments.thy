@@ -7,6 +7,7 @@ Author: Deivid Vale <email-here>
 theory Experiments
   imports Main
   "First_Order_Terms.Unifiers"
+  "AC_equality"
 
 begin
 
@@ -28,16 +29,7 @@ definition vars_eq :: "('f, 'v) equation \<Rightarrow> 'v set"
 definition vars_eqs :: "('f, 'v) problem \<Rightarrow> 'v set"
   where "vars_eqs \<Gamma> \<equiv> \<Union> e \<in> set \<Gamma>. vars_eq e"
 
-
-
-datatype ach = Unin | AC | Hom
-
-locale signature = 
-  fixes arity :: "'f \<Rightarrow> nat"
-    and label :: "'f \<Rightarrow> ach"
-  assumes label_inj: "inj label"
-
-
+context signature
 begin
 
 fun get_args_ac:: "('f, 'v) term \<Rightarrow> ('f, 'v) term list" where
@@ -191,5 +183,6 @@ foldl f 0 (t#ts) =  foldl f (f 0 t) ts
 *)
 
 
+print_locale! signature
 
 end
