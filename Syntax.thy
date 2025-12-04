@@ -50,16 +50,20 @@ lemma example2:
 
 (* Now we define a function that decides the above predicate *)
 
+fun is_headed_by_ac :: \<open>('f, 'v) term \<Rightarrow> bool\<close> where
+  \<open>is_headed_by_ac s =
+    (case s of
+      (Var _)   \<Rightarrow> False |
+      (Fun g _) \<Rightarrow> (case label g of
+        AC \<Rightarrow> True |
+        _ \<Rightarrow> False)
+  )\<close>
+
 fun dec_IsFlattened :: \<open>('f, 'v) term \<Rightarrow> bool\<close> where
   \<open>dec_IsFlattened (Var _) = True\<close> |
   \<open>dec_IsFlattened (Fun f ts) =
     (case label f of
       AC \<Rightarrow> (
-        let is_headed_by_ac =
-          \<lambda> s. (case s of
-                  (Var _)   \<Rightarrow> False |
-                  (Fun g _) \<Rightarrow> (case label g of AC \<Rightarrow> True | _ \<Rightarrow> False)
-        ) in
         let ac_arg = find is_headed_by_ac ts in
         (case ac_arg of
           None \<Rightarrow> True |
@@ -93,9 +97,127 @@ fun dec_is_flatten_aux :: \<open>('f, 'v) term \<Rightarrow> bool \<Rightarrow> 
 fun dec_is_flatten :: \<open>('f, 'v) term \<Rightarrow> bool\<close> where
   \<open>dec_is_flatten t = dec_is_flatten_aux t False\<close>
 
+
++ [s1 , ..., sm ]
+
+  1. 
+
+
 *)
 
 text \<open>We define a function that flattens a term\<close>
+
+fun pred_split_aux :: \<open>('a \<Rightarrow> bool) \<Rightarrow> 'a list \<Rightarrow> 'a list * 'a list \<Rightarrow> 'a list * 'a list\<close> where
+  \<open>pred_split_aux P xs (ys,ns)=
+    (case xs of
+      []      \<Rightarrow> (ys,ns) |
+      x # xs' \<Rightarrow> (
+        if P x then 
+          pred_split_aux P xs' (x#ys, ns)
+        else
+          pred_split_aux P xs' (ys, x#ns)
+      )
+    )\<close>
+
+fun pred_split :: \<open>('a \<Rightarrow> bool) \<Rightarrow> 'a list \<Rightarrow> 'a list * 'a list\<close> where
+  \<open>pred_split P xs = pred_split_aux P xs ([],[])\<close>
+
+fun flatten :: \<open>('f, 'v) term \<Rightarrow> ('f, 'v) term\<close> where
+  \<open>flatten s = 
+    (case s of
+      Var _    \<Rightarrow> s |
+      Fun f ss \<Rightarrow>
+        (case label f of
+          AC \<Rightarrow> (
+            let args_split = pred_split is_headed_by_ac ss in
+            let ac_args  = fst args_split in
+            let nac_args = snd args_split in
+            (case ac_args of
+              []    \<Rightarrow> s |
+              _ # _ \<Rightarrow> (
+                let args_of_ac_args = concat (map args ac_args) in
+                Fun f (args_of_ac_args @ nac_args)
+              )
+            )
+        )|
+          _  \<Rightarrow> Fun f (map flatten ss)
+        )
+    )\<close>
+
+lemma flatten_soundness: \<open>\<forall> t::('f, 'v) term. IsFlattened (flatten t)\<close>
+  sorry
+
+(* or *)
+
+lemma flatten_soundness_dec: \<open>\<forall> t::('f, 'v) term. dec_IsFlattened t \<close>
+  sorry
+
+
+(* I think this function is correct in the sense of the lemmas above.
+  However, i think it is still wrong: 
+  notice that we only check for those arguments that are labelled with AC without ever
+  discriminating them apart, and we put all together...
+  this will cause flatten to change the semantics of the term whenever the
+  input signature have more than one symbol labelled as AC.
+
+  Mean Spirited Example:
+  Let \<Sigma> be f : AC, and g : AC, (other symbols can be added...
+
+  So flatten of s = f [t1 ; ..., g [s1,s2] , ...., g [s3, s4] , ... , tn) will compute as follows:
+
+  ac_args = [ g[s1,s2] , g [s3, s4] ] (so we collected all AC arguments of s), 
+  the non ac arguments are on the other list
+
+  args_of_ac_args = [ [s1, s2] , [s3, s4] ] (collect all the arguments of the AC terms)
+
+  then we flatten the list
+
+  args_of_ac_args = [s1, s2, s3, s4 ]
+
+  later we combine them back into the arguments of s
+
+  flatten s = f [s1 , s2 , s3 , s4] @ [t1, ...., tn ]
+
+  now see that g function symbol disappeared...
+
+  BUT according to our relation IsFlattened flatten s is flat, which is actually correct
+
+  but s above is not flat...
+
+  if we consider a signature that has more than one ac symbol:
+      s = f [t1 ; ..., g [s1,s2] , ...., g [s3, s4] , ... , tn)
+      is flattened, (assuming f doesn't occur in the t_is for simplicity's sake)
+
+      so IsFlattened MUST be defined with respect to the same function symbol
+      not only the labels.
+
+      This way, s is flattened because none of 
+      its direct arguments are labelled AC AND are headed by f
+
+      
+
+Questions then:
+  1. Can our ACh (or even the AC from maximal) algorithm deal with more than one AC symbol?
+    - Intuitively, it can as long as we can dinamically change the label of a symbol.
+    - But i am not sure if this was even considered by guilherme when defining the ACh unification.
+    
+
+Possible approaches:
+  1. We restrict the whole formalization and terms to a single AC constructor.
+    - Functions must change, but that's fine since we are earlier in the definitions.
+    - The predicate IsFlattened and flatten function doesn't change
+
+  2. We keep it general and allow for multiple AC symbols.
+    - Then we need to change IsFlattened and flatten.
+    - I don't think anything changes on the definition of equality since there we enforce
+    that two functions headed by function symbol are equal only if their head symbols are equal.
+
+I like 2 more, specially if the original paper only considered a single AC symbol... 
+We can say we have a general ACh unification that is also formalized :)
+
+I am taking this decision alone so discussions are needed.
+
+*)
 
 end
 end
