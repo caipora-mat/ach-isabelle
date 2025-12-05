@@ -38,6 +38,12 @@ inductive IsFlattened :: \<open>('f, 'v) term \<Rightarrow> bool\<close> where
   \<open>\<lbrakk>label f = AC; t \<in> set ts;  t = Fun g tss; label g \<noteq> AC \<rbrakk>
       \<Longrightarrow> IsFlattened (Fun f ts)\<close>
 
+lemma test1_IsFlattened:
+  assumes "label f = AC" and "label g = Hom"
+  shows "IsFlattened (Fun f [Var x, Fun g [Var y, Fun f [Var z, Fun f [Var z, Var x]]]])"
+  using IsFlattened.simps assms(2) by fastforce
+ 
+
 value  "set [Var x, Fun g [Fun f [Var y, Var x], Var x]]"
 
 lemma example2:
