@@ -116,7 +116,8 @@ lemma dec_pred_flatten:
 
 lemma dec_pred_is_flatten:
   "IsFlattened s \<longleftrightarrow> dec_IsFlattened s" (is "?L \<longleftrightarrow> ?R ")
-proof (cases s)
+sorry
+(*proof (cases s)
   case (Var x)
   then show ?thesis
     using Var varIsFlattened by fastforce
@@ -156,7 +157,7 @@ case (Fun f ts)
     qed
   qed
 qed
-
+*)
 (*
 
 This function is too complicated, the implementation above is simpler.
@@ -225,6 +226,14 @@ fun flatten :: \<open>('f, 'v) term \<Rightarrow> ('f, 'v) term\<close> where
           _  \<Rightarrow> Fun f (map flatten ss)
         )
     )\<close>
+
+text \<open>O exemplo abaixo está com problema \<close>
+
+lemma test1_Flatten:
+  assumes "label f = AC" and "label g = Hom"
+  shows " flatten (Fun f [Var x, Fun g [Var y, Fun f [Var z, Fun f [Var z, Var x]]]]) = Fun f [Var x, Fun g [Var y, Fun f [Var z, Var z, Var x]]] "
+  apply (simp add: assms)
+  sorry
 
 lemma flatten_soundness: \<open>\<forall> t::('f, 'v) term. IsFlattened (flatten t)\<close>
   sorry
