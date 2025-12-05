@@ -14,8 +14,10 @@ locale signature =
 begin
 
 (* baby lemmas about labels *)
-lemma non_ac : \<open>label f \<noteq> AC \<Longrightarrow> label f = Unin \<or> label f = Hom\<close>
-  using ach.exhaust by blast
+lemma non_ac : 
+  assumes \<open>label f \<noteq> AC\<close>
+  shows \<open>label f = Unin \<or> label f = Hom\<close>
+using ach.exhaust assms by blast
 
 section \<open>Flattened Terms\<close>
 
@@ -59,6 +61,25 @@ fun is_headed_by_ac :: \<open>('f, 'v) term \<Rightarrow> bool\<close> where
         _ \<Rightarrow> False)
   )\<close>
 
+
+lemma test_is_headed_by_ac:
+  assumes "label f = AC" and "label g = Unin"
+  shows "is_headed_by_ac (Fun f [Var x, Fun g [Var y, Var z]])"
+  using assms by simp
+
+lemma test_is_not_headed_by_ac:
+  assumes "label f = AC" and " label g = Hom"
+  shows "\<not> is_headed_by_ac (Fun g [Var x, Fun f [Var y, Var z]])"
+proof
+  assume H: "is_headed_by_ac (Fun g [Var x, Fun f [Var y, Var z]])"
+  from H have "(case label g of AC \<Rightarrow> True | _ \<Rightarrow> False)"
+    by simp
+  moreover from assms have "label g = Hom" 
+    by simp
+  ultimately show "False" by simp
+qed
+
+
 fun dec_IsFlattened :: \<open>('f, 'v) term \<Rightarrow> bool\<close> where
   \<open>dec_IsFlattened (Var _) = True\<close> |
   \<open>dec_IsFlattened (Fun f ts) =
@@ -72,8 +93,69 @@ fun dec_IsFlattened :: \<open>('f, 'v) term \<Rightarrow> bool\<close> where
       _  \<Rightarrow> foldl (\<and>) True (map dec_IsFlattened ts)
     )\<close>
 
-lemma dec_pred_is_flatten: \<open>\<forall>s. IsFlattened s \<longleftrightarrow> dec_IsFlattened s\<close>
+
+lemma test_dec_IsFlattened:
+  assumes "label f = AC"
+  shows "\<not> dec_IsFlattened (Fun f [Var x, Fun f [Var y, Var z]])"
+  using assms by simp
+
+text \<open> The following should not be possible to prove. \<close>
+lemma test1_dec_IsFlattened:
+  assumes "label f = AC" and "label g = Hom"
+  shows " dec_IsFlattened (Fun f [Var x, Fun g [Var y, Fun f [Var z, Fun f [Var z, Var x]]]])"
+  apply (auto)
+  apply (simp add: assms)
+  done 
+
+lemma dec_pred_flatten:
+  assumes "IsFlattened s"
+  shows " dec_IsFlattened s"
+  apply (induction s)
+   apply (simp)
   sorry
+
+lemma dec_pred_is_flatten:
+  "IsFlattened s \<longleftrightarrow> dec_IsFlattened s" (is "?L \<longleftrightarrow> ?R ")
+proof (cases s)
+  case (Var x)
+  then show ?thesis
+    using Var varIsFlattened by fastforce
+next
+case (Fun f ts)
+  then show ?thesis
+  proof
+    assume H: "IsFlattened (Fun f ts)"
+    from H show ?thesis
+      unfolding dec_IsFlattened_def
+    proof (cases "label f = AC")
+      case True
+      (* AC case: use your acIsFlattened rule / elimination to match
+         the condition that dec_IsFlattened checks for AC-symbols *)
+      from H True show ?thesis
+        by (auto elim: IsFlattened.cases)
+    next
+      case False
+      (* non-AC case: use funIsFlattened + IH on all arguments *)
+      from H False show ?thesis
+        by (auto elim: IsFlattened.cases)
+    qed
+  next
+    assume H: "dec_IsFlattened (Fun f ts)"
+    show "IsFlattened (Fun f ts)"
+      unfolding dec_IsFlattened_def
+    proof (cases "label f = AC")
+      case True
+      (* AC case: build an IsFlattened proof using acIsFlattened *)
+      from H True show ?thesis
+        by (auto intro: IsFlattened.intros)
+    next
+      case False
+      (* non-AC case: use funIsFlattened and IH on arguments *)
+      from H False show ?thesis
+        by (auto intro: IsFlattened.intros)
+    qed
+  qed
+qed
 
 (*
 
