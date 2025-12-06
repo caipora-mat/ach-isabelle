@@ -21,40 +21,62 @@ using ach.exhaust assms by blast
 
 section \<open>Flattened Terms\<close>
 
-text \<open>\<close>
+text \<open>blabla \<close>
 
-inductive IsFlattened :: \<open>('f, 'v) term \<Rightarrow> bool\<close> where
-  (* Every variable term is flattened *)
-  varIsFlattened: \<open>IsFlattened (Var x)\<close> |
 
-  (* If s :: ('v, 'f) term is a non-AC application term, i.e., s is written as f(s1, ..., sn)
-  then s is flattened if all of its arguments are.*)
+inductive IsFlattened :: "('f, 'v) term \<Rightarrow> bool" where
+  varIsFlattened:
+    "IsFlattened (Var x)" |
+
   funIsFlattened:
-  \<open>\<lbrakk>label f \<noteq> AC ; t \<in> set ts \<Longrightarrow> IsFlattened t\<rbrakk> \<Longrightarrow> IsFlattened (Fun f ts)\<close> |
+    "\<lbrakk> label f \<noteq> AC;
+       \<And>t. t \<in> set ts \<Longrightarrow> IsFlattened t \<rbrakk>
+     \<Longrightarrow> IsFlattened (Fun f ts)" |
 
-  (* An application term (Fun f ts), headed by an AC symbol, is flattened whenever:
-    for all t \<in> ts, and function symbol g occurring in t, g is not an AC symbol.*)
   acIsFlattened:
-  \<open>\<lbrakk>label f = AC; t \<in> set ts;  t = Fun g tss; label g \<noteq> AC \<rbrakk>
-      \<Longrightarrow> IsFlattened (Fun f ts)\<close>
+    "\<lbrakk> label f = AC;
+       \<And>t. t \<in> set ts \<Longrightarrow> IsFlattened t;
+       \<And>t g tss. t \<in> set ts \<Longrightarrow> t = Fun g tss \<Longrightarrow> g \<noteq> f \<rbrakk>
+     \<Longrightarrow> IsFlattened (Fun f ts)"
 
+(*
+
+Is_Flattened t1 \<and> Is_Flattened t2 \<and> Is_Flattened t3 \<and> head(ti)\<noteq> f
+------------------------------------------------------------------- f=AC
+Is_flattened f[t1,t2,t3]
+*)
+lemma test1_IsFlattened:
+  assumes "label f = Unin"
+  shows "IsFlattened (Fun f [Var x, Fun f [Var y, Var x]])"
+  by (metis ach.simps(2) assms empty_set funIsFlattened list.simps(15) set_ConsD singletonD
+      varIsFlattened)
+
+
+lemma test2_IsFlattened:
+  assumes "label f = AC"
+  shows "\<not> IsFlattened (Fun f [Var x, Fun f [Var y, Var x]])"
+  using assms signature.IsFlattened.cases signature_axioms by force
+ 
+ 
+(*
 lemma test1_IsFlattened:
   assumes "label f = AC" and "label g = Hom"
-  shows "IsFlattened (Fun f [Var x, Fun g [Var y, Fun f [Var z, Fun f [Var z, Var x]]]])"
-  using IsFlattened.simps assms(2) by fastforce
- 
+  shows "\<not>(IsFlattened (Fun f [Var x, Fun g [Var y, Fun f [Var z, Fun f [Var z, Var x]]]]))"
+  sorry 
 
+  
+lemma test2_IsFlattened:
+  assumes "label f = AC" and "label g = Hom"
+  shows "IsFlattened (Fun f [Var x, Fun g [Var y, Fun f [Var z, Fun f [Var z, Var x]]]])"
+   sorry
+
+*)
 value  "set [Var x, Fun g [Fun f [Var y, Var x], Var x]]"
 
 lemma example2:
   assumes "label f = AC" and "label g = Unin"
   shows "IsFlattened (Fun f [Var x, Fun g [Fun f [Var y, Var x], Var x]])"
-  apply (rule acIsFlattened)
-   apply (simp add: assms(1))
-    apply (simp)
-    apply (auto)
-   apply (simp add: assms(2))
-  done
+  sorry
 
 (* Now we define a function that decides the above predicate *)
 
@@ -122,7 +144,8 @@ lemma dec_pred_flatten:
 
 lemma dec_pred_is_flatten:
   "IsFlattened s \<longleftrightarrow> dec_IsFlattened s" (is "?L \<longleftrightarrow> ?R ")
-sorry
+  sorry
+
 (*proof (cases s)
   case (Var x)
   then show ?thesis
