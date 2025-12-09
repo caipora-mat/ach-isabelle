@@ -13,20 +13,51 @@ inductive eq_ac:: \<open>('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow>
   
   nac_fun: \<open> \<lbrakk>
           label f \<noteq> AC ;
-          length ts > 0 ;
           length ts = length gs ;
-          i < length ts \<Longrightarrow> eq_ac (ts!i) (gs!i)
+          \<And>i. (i < length ts \<Longrightarrow> eq_ac (ts!i) (gs!i))
           \<rbrakk> \<Longrightarrow> eq_ac (Fun f ts) (Fun f gs)\<close> |
 
   ac_fun: \<open>\<lbrakk>
           label f = AC ;
-          length ts > 0 ;
           length ts = length gs ;
-          \<exists> j. (
-            eq_ac (ts!1) (gs!j) \<and>
-            eq_ac (Fun f (remove1 (ts!1) ts)) (Fun f (remove1 (ts!i) ts))
+          \<exists> j. ( j \<le> length ts \<and>
+            eq_ac (ts!0) (gs!j) \<and>
+            eq_ac (Fun f (remove1 (ts!0) ts)) (Fun f (remove1 (gs!j) gs))
           )
           \<rbrakk> \<Longrightarrow> eq_ac (Fun f ts) (Fun f gs)\<close>
+
+lemma test1x:
+  assumes "label f = AC"
+  and "x \<noteq> y"
+  shows "\<not>(eq_ac (Fun f [Var x]) (Fun f [Var y]))"
+proof
+  assume "eq_ac (Fun f [Var x]) (Fun f [Var y])"
+  have "[Var x] \<noteq> [Var y]"
+    using assms by simp
+  hence "Fun f [Var x] \<noteq> Fun f [Var y]"
+    using ac_fun by simp
+  then have "\<not>(\<exists> j. j \<le> length [Var y] \<and> eq_ac ([Var x] ! 0) ([Var y] ! j) \<and>
+            eq_ac (Fun f (remove1 ([Var x] ! 0) [Var x])) (Fun f (remove1 ([Var y] ! j) [Var y])))"
+  proof(cases "j=0")
+    case True
+    then have "\<not>(eq_ac ([Var x] ! 0) ([Var y] ! 0))"
+      using assms by simp
+  next
+    case False
+    then show ?thesis sorry
+  qed
+    
+  then show "False" using ac_fun assms by auto
+    
+  
+
+
+lemma test2x:
+  assumes "label f = AC"
+  shows "eq_ac (Fun f [Var x, Fun g []]) (Fun f [Fun g [], Var x])"
+  apply (rule ac_fun)
+    apply (simp add: assms, auto)
+  sorry
 
 (* 
 
@@ -55,10 +86,25 @@ text \<open> Next, we have to prove that this inductive relation is indeed an eq
 
 (* comes directly from the refl axiom *)
 lemma ac_eq_refl: \<open>eq_ac t t\<close>
-  sorry
+  using ac_refl by blast
+  
 
 lemma ac_eq_sym: \<open>eq_ac s t \<Longrightarrow> eq_ac t s\<close>
-  sorry
+proof (induction rule: eq_ac.induct)
+  case (ac_refl t)
+  then show ?case 
+    using ac_eq_refl by blast
+next
+  case (nac_fun f ts gs i)
+  then show ?case 
+    using eq_ac.nac_fun
+    by metis
+next
+  case (ac_fun f ts gs)
+  then show ?case sorry
+qed
+
+
 
 lemma ac_eq_trans: \<open>eq_ac s t \<and> eq_ac t u \<Longrightarrow> eq_ac s u\<close>
   sorry
@@ -127,6 +173,7 @@ value "dec_ac (Var 0) (Fun f [Var 0])" (* I don't know why this doesn't compute 
 end
 
 print_locale! signature
+
 
 
 end
