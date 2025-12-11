@@ -170,10 +170,9 @@ function dec_ac :: \<open>('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow
 
 value "dec_ac (Var 0) (Fun f [Var 0])" (* I don't know why this doesn't compute since this case doesnt'depend on how label is defined... *)
 
+(* Every term is AC equivalent to its flattened version. *)
+lemma flatten_ac_eq: \<open>\<forall> t::('f, 'v) term. eq_ac (flatten t) t\<close>
+  sorry
+
 end
-
-print_locale! signature
-
-
-
 end
