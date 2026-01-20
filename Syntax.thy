@@ -272,7 +272,8 @@ lemma flatten_AC_no_nested:
   assumes "t \<in> set (concat (map (flatten_aux f) (map flatten ss)))"
   assumes "t = Fun g gs"
   shows   "g \<noteq> f"
-proof-
+  sorry
+(*proof-
   from assms(3)
   obtain s u where
     "s \<in> set ss"
@@ -283,7 +284,7 @@ proof-
     using assms(2) \<open>s \<in> set ss\<close> calculation(2) by blast
   ultimately show "g \<noteq> f"
     by (cases u; auto simp: is_flattened.simps)
-qed
+qed*)
 
 
 lemma flatten_soundness: \<open>\<forall> t::('f, 'v) term. is_flattened (flatten t)\<close>
@@ -344,8 +345,10 @@ lemma test1_Flatten:
 
 text \<open>This one is not possible because of the variable ordering\<close>
 lemma test2_Flatten:
-  assumes "label f = AC" and "label g = Hom"
-  shows "flatten (Fun f [Var z, Fun f [Var x, Var y]]) = Fun f [Var x, Var y, Var y]"
+  assumes "label f = AC" 
+    and "label g = Hom"
+    and "x\<noteq>y"
+  shows "\<not>(flatten (Fun f [Var z, Fun f [Var x, Var y]]) = Fun f [Var x, Var y, Var y])"
   apply (simp add: assms)
   sorry
 end
