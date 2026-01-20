@@ -238,12 +238,23 @@ proof-
      then show ?case
        by (simp add: is_flattened.fun_is_flattened)
    next
-     case (ac_is_flattened f ts)
-     then show ?case
-       by (smt (verit) Term.term.simps(6) empty_def empty_set flatten_aux.simps flatten_aux_AC
-           is_flattened.simps mem_Collect_eq set_ConsD) (*sledgehammer*)
+     case (ac_is_flattened g ts)
+     show ?case
+     proof (cases "f = g")
+      case True
+      then have "flatten_aux f (Fun g ts) = ts"
+        using ac_is_flattened.hyps by simp
+      with ac_is_flattened True show ?thesis
+        by simp
+    next
+      case False
+      then have "s = Fun g ts"
+        using ac_is_flattened by simp
+      then show ?thesis
+        using ac_is_flattened is_flattened.simps by blast
    qed
  qed
+qed
 
 
 lemma flatten_AC_args_flattened:
@@ -257,8 +268,8 @@ proof-
     "s \<in> set ss"
     "u = flatten s"
     "t \<in> set (flatten_aux f u)"
-    apply auto
-    done
+    by auto
+
   moreover have "is_flattened u"
     using assms(2) \<open>s \<in> set ss\<close> calculation(2) by blast
 
@@ -266,14 +277,46 @@ proof-
     using flatten_aux_flattened by blast
 qed
 
+
+lemma flatten_aux_no_head:
+  assumes "is_flattened u"
+      and "label f = AC"
+      and "t \<in> set (flatten_aux f u)"
+      and "t = Fun g gs"
+  shows "g \<noteq> f"
+using assms
+proof (induct rule: is_flattened.induct)
+  case (var_is_flattened x)
+  then show ?case by simp
+next
+  case (fun_is_flattened h ts)
+  then show ?case by auto
+next
+  case (ac_is_flattened h ts)
+  then show ?case
+  proof (cases "f = h")
+    case True
+    then have "flatten_aux f (Fun h ts) = ts"
+      using ac_is_flattened.hyps by simp
+    with ac_is_flattened True show ?thesis
+      by auto
+  next
+    case False
+    then have "flatten_aux f (Fun h ts) = [Fun h ts]"
+      by simp
+    with ac_is_flattened False show ?thesis
+      by simp
+  qed
+qed
+
+
 lemma flatten_AC_no_nested:
   assumes "label f = AC"
   assumes "\<And>t. t \<in> set ss \<Longrightarrow> is_flattened (flatten t)"
   assumes "t \<in> set (concat (map (flatten_aux f) (map flatten ss)))"
   assumes "t = Fun g gs"
   shows   "g \<noteq> f"
-  sorry
-(*proof-
+proof-
   from assms(3)
   obtain s u where
     "s \<in> set ss"
@@ -283,8 +326,9 @@ lemma flatten_AC_no_nested:
   moreover have "is_flattened u"
     using assms(2) \<open>s \<in> set ss\<close> calculation(2) by blast
   ultimately show "g \<noteq> f"
-    by (cases u; auto simp: is_flattened.simps)
-qed*)
+    using assms(1,4) flatten_aux_no_head
+    by blast
+qed
 
 
 lemma flatten_soundness: \<open>\<forall> t::('f, 'v) term. is_flattened (flatten t)\<close>
@@ -302,7 +346,9 @@ proof
       have a: "flatten (Fun f ss) = Fun f (concat (map (flatten_aux f) (map flatten ss)))"
         using True by simp
       show ?thesis 
-      proof(subst a, rule is_flattened.ac_is_flattened)
+        apply (subst a)
+        apply(rule is_flattened.ac_is_flattened)
+      proof-
         show "label f = AC"
           by fact
         show "\<And>t. t \<in> set (concat (map (flatten_aux f) (map flatten ss))) \<Longrightarrow> is_flattened t"
