@@ -8,56 +8,49 @@ context signature
 
 begin
 
-inductive eq_ac:: \<open>('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow> bool\<close> where
-  ac_refl: \<open>eq_ac t t\<close> |
+inductive eq_ac:: \<open>('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow> bool\<close> ("_ \<approx>\<^sub>A\<^sub>C  _" [80,80] 80) where
+  ac_refl: \<open>t \<approx>\<^sub>A\<^sub>C t\<close> |
   
   nac_fun: \<open> \<lbrakk>
           label f \<noteq> AC ;
           length ts = length gs ;
-          \<And>i. (i < length ts \<Longrightarrow> eq_ac (ts!i) (gs!i))
-          \<rbrakk> \<Longrightarrow> eq_ac (Fun f ts) (Fun f gs)\<close> |
+          \<And>i. (i < length ts \<Longrightarrow> ts!i \<approx>\<^sub>A\<^sub>C gs!i)
+          \<rbrakk> \<Longrightarrow>  (Fun f ts) \<approx>\<^sub>A\<^sub>C (Fun f gs)\<close> |
 
   ac_fun: \<open>\<lbrakk>
           label f = AC ;
-          length ts = length gs ;
-          \<exists> j. ( j \<le> length ts \<and>
-            eq_ac (ts!0) (gs!j) \<and>
-            eq_ac (Fun f (remove1 (ts!0) ts)) (Fun f (remove1 (gs!j) gs))
+          \<exists> i j. (i \<le> length ts \<and> j \<le> length gs \<and>
+             (ts!i) \<approx>\<^sub>A\<^sub>C (gs!j) \<and>
+             (Fun f (remove1 (ts!i) ts)) \<approx>\<^sub>A\<^sub>C (Fun f (remove1 (gs!j) gs))
           )
-          \<rbrakk> \<Longrightarrow> eq_ac (Fun f ts) (Fun f gs)\<close>
+          \<rbrakk> \<Longrightarrow>  (Fun f ts) \<approx>\<^sub>A\<^sub>C (Fun f gs)\<close>
 
-lemma test1x:
+inductive_cases AC_equ_elims:
+"t \<approx>\<^sub>A\<^sub>C t"
+"(Fun f ts) \<approx>\<^sub>A\<^sub>C (Fun f gs)"
+
+(*lemma test1x:
   assumes "label f = AC"
   and "x \<noteq> y"
-  shows "\<not>(eq_ac (Fun f [Var x]) (Fun f [Var y]))"
-proof
-  assume "eq_ac (Fun f [Var x]) (Fun f [Var y])"
-  have "[Var x] \<noteq> [Var y]"
-    using assms by simp
+shows "\<not>(eq_ac (Fun f [Var x]) (Fun f [Var y]))"
+proof-
+  have i: "[Var x] \<noteq> [Var y]"
+    using assms by auto
   hence "Fun f [Var x] \<noteq> Fun f [Var y]"
     using ac_fun by simp
   then have "\<not>(\<exists> j. j \<le> length [Var y] \<and> eq_ac ([Var x] ! 0) ([Var y] ! j) \<and>
             eq_ac (Fun f (remove1 ([Var x] ! 0) [Var x])) (Fun f (remove1 ([Var y] ! j) [Var y])))"
-  proof(cases "j=0")
-    case True
-    then have "\<not>(eq_ac ([Var x] ! 0) ([Var y] ! 0))"
-      using assms by simp
-  next
-    case False
-    then show ?thesis sorry
-  qed
-    
-  then show "False" using ac_fun assms by auto
-    
-  
+    using eq_ac.cases length_0_conv neq_Nil_conv nth_Cons_0 remove1.simps(2)
+        signature.AC_equ_elims(2) term.distinct(1) by (metis)
+  with i assms show ?thesis using AC_equ_elims(2)[of f \<open>[Var x]\<close> \<open>[Var y]\<close>] by auto
+qed*)
 
-
-lemma test2x:
+(*lemma test2x:
   assumes "label f = AC"
   shows "eq_ac (Fun f [Var x, Fun g []]) (Fun f [Fun g [], Var x])"
   apply (rule ac_fun)
     apply (simp add: assms, auto)
-  sorry
+  sorry*)
 
 (* 
 
@@ -85,32 +78,35 @@ lemma test2x:
 text \<open> Next, we have to prove that this inductive relation is indeed an equivalent relation. \<close>
 
 (* comes directly from the refl axiom *)
-lemma ac_eq_refl: \<open>eq_ac t t\<close>
+lemma ac_eq_refl: \<open>t \<approx>\<^sub>A\<^sub>C t\<close>
   using ac_refl by blast
   
 
-lemma ac_eq_sym: \<open>eq_ac s t \<Longrightarrow> eq_ac t s\<close>
+lemma ac_eq_sym: \<open>s \<approx>\<^sub>A\<^sub>C t \<Longrightarrow> t \<approx>\<^sub>A\<^sub>C s\<close>
 proof (induction rule: eq_ac.induct)
   case (ac_refl t)
   then show ?case 
-    using ac_eq_refl by blast
+    using eq_ac.ac_refl by auto
 next
-  case (nac_fun f ts gs i)
-  then show ?case 
-    using eq_ac.nac_fun
-    by metis
+  case (nac_fun f ts gs)
+  then show ?case
+    by (simp add: eq_ac.nac_fun)
 next
   case (ac_fun f ts gs)
-  then show ?case sorry
+   have i:
+   "\<exists> i j.  (i \<le> length gs \<and>
+          j \<le> length ts) \<and> 
+    (gs ! i \<approx>\<^sub>A\<^sub>C  ts ! j) \<and> (Fun f (remove1 (gs ! i) gs) \<approx>\<^sub>A\<^sub>C  Fun f (remove1 (ts ! j) ts))"
+     using ac_fun.IH ac_fun.hyps by blast+
+  then show ?case using eq_ac.ac_fun[OF ac_fun(1)] by auto
 qed
 
 
-
-lemma ac_eq_trans: \<open>eq_ac s t \<and> eq_ac t u \<Longrightarrow> eq_ac s u\<close>
+lemma ac_eq_trans:  \<open>\<lbrakk>s \<approx>\<^sub>A\<^sub>C t ; t \<approx>\<^sub>A\<^sub>C u \<rbrakk> \<Longrightarrow>  s \<approx>\<^sub>A\<^sub>C u\<close>
   sorry
 
 
-lemma ac_eq_subst: \<open>eq_ac s t \<Longrightarrow> eq_ac (s \<cdot> \<sigma>) (t \<cdot> \<sigma>)\<close>
+lemma ac_eq_subst: \<open> s \<approx>\<^sub>A\<^sub>C t \<Longrightarrow>  (s \<cdot> \<sigma>) \<approx>\<^sub>A\<^sub>C (t \<cdot> \<sigma>)\<close>
 proof (induction s)
   case (Var x)
   then show ?case sorry
@@ -124,8 +120,31 @@ qed
   I'm thinking I have to say something like: \<forall> t \<in> set ts. ... 
   Question 2: perhaps we can put closure for \<Sigma>-operations and substitutions as axioms?
 *)
-lemma ac_eq_fun: \<open>eq_ac s t \<Longrightarrow> eq_ac (Fun f [s]) (Fun f [t])\<close>
-  sorry
+
+
+lemma ac_eq_fun: 
+  assumes \<open>s \<approx>\<^sub>A\<^sub>C t\<close>
+  shows \<open>(Fun f [s]) \<approx>\<^sub>A\<^sub>C (Fun f [t])\<close>
+proof(cases "label f = AC")
+  case True
+   have i: "length [s] = length [t]" by simp
+   have "\<exists> i j.
+       (i \<le>length [s] \<and> j \<le> length [t]) \<and> [s] ! i \<approx>\<^sub>A\<^sub>C  [t] ! j \<and> Fun f (remove1 ([s] ! i) [s]) \<approx>\<^sub>A\<^sub>C  Fun f (remove1 ([t] ! j) [t])"
+    using assms ac_refl by force
+   with i show ?thesis using ac_fun[OF True] by blast
+next
+  case False
+    have i: "length [s] = length [t]" by simp
+    have "\<And>i. i < length [s] \<Longrightarrow> [s]!i \<approx>\<^sub>A\<^sub>C [t]!i" 
+      using assms ac_refl by simp
+    with i show ?thesis using nac_fun[OF False i] by simp
+qed
+
+
+(*If t = f (t1,...,tn) and  t1 \<approx>AC t1' 
+
+then f(t1,...,tn)\<approx>AC f(t1',...,tn')
+*)
 
 section \<open>Decidability of AC equality \<close>
 
@@ -171,8 +190,33 @@ function dec_ac :: \<open>('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow
 value "dec_ac (Var 0) (Fun f [Var 0])" (* I don't know why this doesn't compute since this case doesnt'depend on how label is defined... *)
 
 (* Every term is AC equivalent to its flattened version. *)
-lemma flatten_ac_eq: \<open>\<forall> t::('f, 'v) term. eq_ac (flatten t) t\<close>
-  sorry
+lemma flatten_ac_eq: \<open>(flatten t) \<approx>\<^sub>A\<^sub>C t\<close>
+proof(induct t)
+  case (Var x)
+  then show ?case
+    using ac_refl by auto
+next
+  case (Fun f ts)
+  then show ?case 
+  proof(cases "label f = AC")
+    case True
+    then show ?thesis sorry
+  next
+    case False
+    have lengths: "length (map flatten ts) = length ts"
+      by simp
+    have i: "flatten (Fun f ts) = Fun f (map flatten ts)"
+      using flatten.simps False non_ac by force
+    from Fun nac_fun[OF False lengths] 
+    have "Fun f (map flatten ts) \<approx>\<^sub>A\<^sub>C Fun f ts"
+      using nth_mem by fastforce
+    with i show ?thesis by auto
+  qed
+qed
+
+
 
 end
+
+
 end
