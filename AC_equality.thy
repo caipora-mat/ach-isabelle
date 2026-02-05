@@ -20,7 +20,7 @@ inductive eq_ac:: \<open>('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow>
           \<And>i. (i < length ts \<Longrightarrow> ts!i \<approx>\<^sub>A\<^sub>C gs!i)
           \<rbrakk> \<Longrightarrow>  (Fun f ts) \<approx>\<^sub>A\<^sub>C (Fun f gs)\<close> |
 
-  ac_fun: \<open>\<lbrakk>
+  ac_fun [simp]: \<open>\<lbrakk>
           is_flattened (Fun f ts);
           is_flattened (Fun f gs);
           label f = AC ;
@@ -74,7 +74,18 @@ lemma test3 :
     apply (auto)
     done
    apply (simp add: assms)
-  apply (rule_tac i = 1 in exI)
+  apply (rule exI[where x = 0])
+  apply (rule exI[where x = 0])
+  apply (rule conjI)
+   apply (simp)
+  apply (rule conjI)
+   apply (simp)
+  apply (rule conjI)
+   apply (simp)
+   apply (rule ac_refl)
+   apply (simp)
+  apply (simp)
+  apply (rule ac_fun)
   sorry
 
 
