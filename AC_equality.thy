@@ -8,22 +8,75 @@ context signature
 
 begin
 
-inductive eq_ac:: \<open>('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow> bool\<close> ("_ \<approx>\<^sub>A\<^sub>C  _" [80,80] 80) where
-  ac_refl: \<open>t \<approx>\<^sub>A\<^sub>C t\<close> |
+inductive eq_ac:: \<open>('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow> bool\<close> ("_ \<approx>\<^sub>A\<^sub>C  _" [80,80] 80) 
+  where 
+  ac_refl: \<open> \<lbrakk>is_flattened t\<rbrakk> \<Longrightarrow> t \<approx>\<^sub>A\<^sub>C t \<close> |
   
   nac_fun: \<open> \<lbrakk>
+          is_flattened (Fun f ts);
+          is_flattened (Fun f gs);
           label f \<noteq> AC ;
           length ts = length gs ;
           \<And>i. (i < length ts \<Longrightarrow> ts!i \<approx>\<^sub>A\<^sub>C gs!i)
           \<rbrakk> \<Longrightarrow>  (Fun f ts) \<approx>\<^sub>A\<^sub>C (Fun f gs)\<close> |
 
   ac_fun: \<open>\<lbrakk>
+          is_flattened (Fun f ts);
+          is_flattened (Fun f gs);
           label f = AC ;
           \<exists> i j. (i \<le> length ts \<and> j \<le> length gs \<and>
              (ts!i) \<approx>\<^sub>A\<^sub>C (gs!j) \<and>
              (Fun f (remove1 (ts!i) ts)) \<approx>\<^sub>A\<^sub>C (Fun f (remove1 (gs!j) gs))
           )
           \<rbrakk> \<Longrightarrow>  (Fun f ts) \<approx>\<^sub>A\<^sub>C (Fun f gs)\<close>
+
+lemma test2 : 
+  assumes "label f = AC"
+  shows "Var x \<approx>\<^sub>A\<^sub>C Var x"
+  apply (rule ac_refl) 
+  apply (rule var_is_flattened)
+  done
+
+lemma test1 : 
+  assumes "label g = Unin "
+  shows "Fun g [Var x] \<approx>\<^sub>A\<^sub>C Fun g [Var x ]"
+  apply (rule nac_fun)
+      apply (rule fun_is_flattened)
+       apply (simp add: assms)
+      apply (auto)
+    apply (rule fun_is_flattened)
+     apply  (simp add: assms)
+    apply (auto)
+   apply (simp add:assms)
+  apply (rule  ac_refl)
+  apply (rule var_is_flattened)
+  done
+
+lemma test3 : 
+  assumes "label f = AC "
+  shows "flatten (Fun f [Var x, Fun f [Var z, Var y]]) \<approx>\<^sub>A\<^sub>C flatten (Fun f [Var x, Var y, Var z])"
+  apply (simp add: assms)
+  apply (rule ac_fun)
+  apply (rule ac_is_flattened)
+       apply (simp add: assms)
+  subgoal 1
+    apply (auto)
+    done
+  subgoal 2
+    apply (auto)
+    done 
+    apply (rule ac_is_flattened)
+      apply (simp add: assms)
+  subgoal 1
+    apply (auto)
+    done
+  subgoal 
+    apply (auto)
+    done
+   apply (simp add: assms)
+  apply (rule_tac i = 1 in exI)
+  sorry
+
 
 inductive_cases AC_equ_elims:
 "t \<approx>\<^sub>A\<^sub>C t"
@@ -187,7 +240,9 @@ function dec_ac :: \<open>('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow
   )\<close>
   by pat_completeness auto
 
+(*
 value "dec_ac (Var 0) (Fun f [Var 0])" (* I don't know why this doesn't compute since this case doesnt'depend on how label is defined... *)
+*)
 
 (* Every term is AC equivalent to its flattened version. *)
 lemma flatten_ac_eq: \<open>(flatten t) \<approx>\<^sub>A\<^sub>C t\<close>
