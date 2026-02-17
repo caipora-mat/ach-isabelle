@@ -20,7 +20,7 @@ using ach.exhaust assms by blast
 section \<open>Flattened Terms\<close>
 
 inductive is_flattened :: "('f, 'v) term \<Rightarrow> bool" where
-  var_is_flattened:
+  var_is_flattened [simp]:
     "is_flattened (Var x)" |
 
   fun_is_flattened:

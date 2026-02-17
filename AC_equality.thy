@@ -20,7 +20,7 @@ inductive eq_ac:: \<open>('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow>
           \<And>i. (i < length ts \<Longrightarrow> ts!i \<approx>\<^sub>A\<^sub>C gs!i)
           \<rbrakk> \<Longrightarrow>  (Fun f ts) \<approx>\<^sub>A\<^sub>C (Fun f gs)\<close> |
 
-  ac_fun [simp]: \<open>\<lbrakk>
+  ac_fun : \<open>\<lbrakk>
           is_flattened (Fun f ts);
           is_flattened (Fun f gs);
           label f = AC ;
