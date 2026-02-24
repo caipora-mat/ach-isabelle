@@ -8,38 +8,41 @@ context signature
 
 begin
 
-inductive eq_ac:: \<open>('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow> bool\<close> ("_ \<approx>\<^sub>A\<^sub>C  _" [80,80] 80) 
+inductive eq_acw:: \<open>('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow> bool\<close> ("_ \<approx>\<^sub>A\<^sub>C\<^sub>w  _" [80,80] 80) 
   where 
-  ac_refl: \<open> \<lbrakk>is_flattened t\<rbrakk> \<Longrightarrow> t \<approx>\<^sub>A\<^sub>C t \<close> |
+  ac_refl: \<open> \<lbrakk>is_flattened t\<rbrakk> \<Longrightarrow> t\<approx>\<^sub>A\<^sub>C\<^sub>w t \<close> |
   
   nac_fun: \<open> \<lbrakk>
           is_flattened (Fun f ts);
           is_flattened (Fun f gs);
           label f \<noteq> AC ;
           length ts = length gs ;
-          \<And>i. (i < length ts \<Longrightarrow> ts!i \<approx>\<^sub>A\<^sub>C gs!i)
-          \<rbrakk> \<Longrightarrow>  (Fun f ts) \<approx>\<^sub>A\<^sub>C (Fun f gs)\<close> |
+          \<And>i. (i < length ts \<Longrightarrow> ts!i \<approx>\<^sub>A\<^sub>C\<^sub>w gs!i)
+          \<rbrakk> \<Longrightarrow>  (Fun f ts) \<approx>\<^sub>A\<^sub>C\<^sub>w (Fun f gs)\<close> |
 
   ac_fun : \<open>\<lbrakk>
           is_flattened (Fun f ts);
           is_flattened (Fun f gs);
           label f = AC ;
           \<exists> i j. (i \<le> length ts \<and> j \<le> length gs \<and>
-             (ts!i) \<approx>\<^sub>A\<^sub>C (gs!j) \<and>
-             (Fun f (remove1 (ts!i) ts)) \<approx>\<^sub>A\<^sub>C (Fun f (remove1 (gs!j) gs))
+             (ts!i) \<approx>\<^sub>A\<^sub>C\<^sub>w (gs!j) \<and>
+             (Fun f (remove1 (ts!i) ts)) \<approx>\<^sub>A\<^sub>C\<^sub>w (Fun f (remove1 (gs!j) gs))
           )
-          \<rbrakk> \<Longrightarrow>  (Fun f ts) \<approx>\<^sub>A\<^sub>C (Fun f gs)\<close>
+          \<rbrakk> \<Longrightarrow>  (Fun f ts) \<approx>\<^sub>A\<^sub>C\<^sub>w (Fun f gs)\<close>
+
+definition eq_ac :: \<open>('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow> bool\<close> ("_ \<approx>\<^sub>A\<^sub>C  _" [80,80] 80)
+  where "eq_ac t1 t2 \<equiv> (flatten t1) \<approx>\<^sub>A\<^sub>C\<^sub>w (flatten t2)"
 
 lemma test2 : 
   assumes "label f = AC"
-  shows "Var x \<approx>\<^sub>A\<^sub>C Var x"
+  shows "Var x \<approx>\<^sub>A\<^sub>C\<^sub>w Var x"
   apply (rule ac_refl) 
   apply (rule var_is_flattened)
   done
 
 lemma test1 : 
   assumes "label g = Unin "
-  shows "Fun g [Var x] \<approx>\<^sub>A\<^sub>C Fun g [Var x ]"
+  shows "Fun g [Var x] \<approx>\<^sub>A\<^sub>C\<^sub>w Fun g [Var x ]"
   apply (rule nac_fun)
       apply (rule fun_is_flattened)
        apply (simp add: assms)
@@ -54,7 +57,7 @@ lemma test1 :
 
 lemma test3 : 
   assumes "label f = AC "
-  shows "flatten (Fun f [Var x, Fun f [Var z, Var y]]) \<approx>\<^sub>A\<^sub>C flatten (Fun f [Var x, Var y, Var z])"
+  shows "flatten (Fun f [Var x, Fun f [Var z, Var y]]) \<approx>\<^sub>A\<^sub>C\<^sub>w flatten (Fun f [Var x, Var y, Var z])"
   apply (simp add: assms)
   apply (rule ac_fun)
   apply (rule ac_is_flattened)
@@ -90,8 +93,8 @@ lemma test3 :
 
 
 inductive_cases AC_equ_elims:
-"t \<approx>\<^sub>A\<^sub>C t"
-"(Fun f ts) \<approx>\<^sub>A\<^sub>C (Fun f gs)"
+"t \<approx>\<^sub>A\<^sub>C\<^sub>w t"
+"(Fun f ts) \<approx>\<^sub>A\<^sub>C\<^sub>w (Fun f gs)"
 
 (*lemma test1x:
   assumes "label f = AC"
@@ -142,8 +145,10 @@ qed*)
 text \<open> Next, we have to prove that this inductive relation is indeed an equivalent relation. \<close>
 
 (* comes directly from the refl axiom *)
-lemma ac_eq_refl: \<open>t \<approx>\<^sub>A\<^sub>C t\<close>
-  using ac_refl by blast
+lemma ac_eq_refl: 
+  assumes \<open>is_flattened t \<close>
+  shows \<open>t \<approx>\<^sub>A\<^sub>C t\<close>
+  using assms ac_refl by auto
   
 
 lemma ac_eq_sym: \<open>s \<approx>\<^sub>A\<^sub>C t \<Longrightarrow> t \<approx>\<^sub>A\<^sub>C s\<close>
