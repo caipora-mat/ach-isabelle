@@ -8,158 +8,53 @@ context signature
 
 begin
 
-inductive eq_acw:: \<open>('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow> bool\<close> ("_ \<approx>\<^sub>A\<^sub>C\<^sub>w  _" [80,80] 80) 
+inductive eq_acw :: \<open>('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow> bool\<close> ("_ \<approx>\<^sub>A\<^sub>C\<^sub>w  _" [80,80] 80) 
   where 
-  ac_refl: \<open> \<lbrakk>is_flattened t\<rbrakk> \<Longrightarrow> t\<approx>\<^sub>A\<^sub>C\<^sub>w t \<close> |
-  
-  nac_fun: \<open> \<lbrakk>
+  ac_refl: \<open>\<lbrakk>is_flattened t\<rbrakk> \<Longrightarrow> t \<approx>\<^sub>A\<^sub>C\<^sub>w t\<close> |
+
+  nac_fun: \<open>\<lbrakk>
+          is_flattened (Fun f ss);
           is_flattened (Fun f ts);
-          is_flattened (Fun f gs);
           label f \<noteq> AC ;
-          length ts = length gs ;
-          \<And>i. (i < length ts \<Longrightarrow> ts!i \<approx>\<^sub>A\<^sub>C\<^sub>w gs!i)
-          \<rbrakk> \<Longrightarrow>  (Fun f ts) \<approx>\<^sub>A\<^sub>C\<^sub>w (Fun f gs)\<close> |
+          length ss = length ts;
+          \<And>i. (i < length ss \<Longrightarrow> ss!i \<approx>\<^sub>A\<^sub>C\<^sub>w ts!i)
+          \<rbrakk> \<Longrightarrow>  (Fun f ss) \<approx>\<^sub>A\<^sub>C\<^sub>w (Fun f ts)\<close> |
 
   ac_fun : \<open>\<lbrakk>
+          is_flattened (Fun f ss);
           is_flattened (Fun f ts);
-          is_flattened (Fun f gs);
           label f = AC ;
-          \<exists> i j. (i \<le> length ts \<and> j \<le> length gs \<and>
-             (ts!i) \<approx>\<^sub>A\<^sub>C\<^sub>w (gs!j) \<and>
-             (Fun f (remove1 (ts!i) ts)) \<approx>\<^sub>A\<^sub>C\<^sub>w (Fun f (remove1 (gs!j) gs))
+          \<exists> i j. (
+            i \<le> length ss \<and>
+            j \<le> length ts \<and>
+            (ss!i) \<approx>\<^sub>A\<^sub>C\<^sub>w (ts!j) \<and>
+            (Fun f (remove1 (ss!i) ss)) \<approx>\<^sub>A\<^sub>C\<^sub>w (Fun f (remove1 (ts!j) ts))
           )
-          \<rbrakk> \<Longrightarrow>  (Fun f ts) \<approx>\<^sub>A\<^sub>C\<^sub>w (Fun f gs)\<close>
+          \<rbrakk> \<Longrightarrow> (Fun f ss) \<approx>\<^sub>A\<^sub>C\<^sub>w (Fun f gs)\<close>
 
 definition eq_ac :: \<open>('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow> bool\<close> ("_ \<approx>\<^sub>A\<^sub>C  _" [80,80] 80)
   where "eq_ac t1 t2 \<equiv> (flatten t1) \<approx>\<^sub>A\<^sub>C\<^sub>w (flatten t2)"
-
-lemma test2 : 
-  assumes "label f = AC"
-  shows "Var x \<approx>\<^sub>A\<^sub>C\<^sub>w Var x"
-  apply (rule ac_refl) 
-  apply (rule var_is_flattened)
-  done
-
-lemma test1 : 
-  assumes "label g = Unin "
-  shows "Fun g [Var x] \<approx>\<^sub>A\<^sub>C\<^sub>w Fun g [Var x ]"
-  apply (rule nac_fun)
-      apply (rule fun_is_flattened)
-       apply (simp add: assms)
-      apply (auto)
-    apply (rule fun_is_flattened)
-     apply  (simp add: assms)
-    apply (auto)
-   apply (simp add:assms)
-  apply (rule  ac_refl)
-  apply (rule var_is_flattened)
-  done
-
-lemma test3 : 
-  assumes "label f = AC "
-  shows "flatten (Fun f [Var x, Fun f [Var z, Var y]]) \<approx>\<^sub>A\<^sub>C\<^sub>w flatten (Fun f [Var x, Var y, Var z])"
-  apply (simp add: assms)
-  apply (rule ac_fun)
-  apply (rule ac_is_flattened)
-       apply (simp add: assms)
-  subgoal 1
-    apply (auto)
-    done
-  subgoal 2
-    apply (auto)
-    done 
-    apply (rule ac_is_flattened)
-      apply (simp add: assms)
-  subgoal 1
-    apply (auto)
-    done
-  subgoal 
-    apply (auto)
-    done
-   apply (simp add: assms)
-  apply (rule exI[where x = 0])
-  apply (rule exI[where x = 0])
-  apply (rule conjI)
-   apply (simp)
-  apply (rule conjI)
-   apply (simp)
-  apply (rule conjI)
-   apply (simp)
-   apply (rule ac_refl)
-   apply (simp)
-  apply (simp)
-  apply (rule ac_fun)
-  sorry
-
 
 inductive_cases AC_equ_elims:
 "t \<approx>\<^sub>A\<^sub>C\<^sub>w t"
 "(Fun f ts) \<approx>\<^sub>A\<^sub>C\<^sub>w (Fun f gs)"
 
-(*lemma test1x:
-  assumes "label f = AC"
-  and "x \<noteq> y"
-shows "\<not>(eq_ac (Fun f [Var x]) (Fun f [Var y]))"
-proof-
-  have i: "[Var x] \<noteq> [Var y]"
-    using assms by auto
-  hence "Fun f [Var x] \<noteq> Fun f [Var y]"
-    using ac_fun by simp
-  then have "\<not>(\<exists> j. j \<le> length [Var y] \<and> eq_ac ([Var x] ! 0) ([Var y] ! j) \<and>
-            eq_ac (Fun f (remove1 ([Var x] ! 0) [Var x])) (Fun f (remove1 ([Var y] ! j) [Var y])))"
-    using eq_ac.cases length_0_conv neq_Nil_conv nth_Cons_0 remove1.simps(2)
-        signature.AC_equ_elims(2) term.distinct(1) by (metis)
-  with i assms show ?thesis using AC_equ_elims(2)[of f \<open>[Var x]\<close> \<open>[Var y]\<close>] by auto
-qed*)
-
-(*lemma test2x:
-  assumes "label f = AC"
-  shows "eq_ac (Fun f [Var x, Fun g []]) (Fun f [Fun g [], Var x])"
-  apply (rule ac_fun)
-    apply (simp add: assms, auto)
-  sorry*)
-
-(* 
-
-  [x ; y ; z] = [y ; w ; x] \<Rightarrow> \<exists>j. x =AC rs!j, take j = 2 
-                            \<Longrightarrow> x =AC x \<and> [y ; z] = [y ; w]
-                            \<Longrightarrow> x =AC x \<and> y =AC y \<and> [z] = [w]
-                            \<Longrightarrow> False
-
-  E = { x + y = y + x ; (x + y) + z = x + (y + z) }
-
- \<approx>_E
-   
-  T(\<Sigma>,X) / \<approx>E (this is an initial algebra)
-
-  if unif_ac(s,t) = \<sigma>, then s \<cdot> \<sigma> =AC t \<cdot> \<sigma> (syntactic soundness)
-  
-  s =AC t iff s \<approx>_AC t (algebraic soundness)
-
-  can i conclude:
-  
-  unif_ac(s,t) = \<sigma> \<Longrightarrow> s \<sigma> \<approx>_AC t \<sigma>
-*)
-
-
 text \<open> Next, we have to prove that this inductive relation is indeed an equivalent relation. \<close>
 
-(* comes directly from the refl axiom *)
-lemma ac_eq_refl: 
-  assumes \<open>is_flattened t \<close>
-  shows \<open>t \<approx>\<^sub>A\<^sub>C t\<close>
+lemma ac_eq_refl:
+  assumes \<open>is_flattened t\<close>
+  shows \<open>t \<approx>\<^sub>A\<^sub>C\<^sub>w t\<close>
   using assms ac_refl by auto
-  
 
-lemma ac_eq_sym: \<open>s \<approx>\<^sub>A\<^sub>C t \<Longrightarrow> t \<approx>\<^sub>A\<^sub>C s\<close>
-proof (induction rule: eq_ac.induct)
+lemma ac_eq_sym: \<open>s \<approx>\<^sub>A\<^sub>C\<^sub>w t \<Longrightarrow> t \<approx>\<^sub>A\<^sub>C\<^sub>w s\<close>
+proof (induction rule: eq_acw.induct)
   case (ac_refl t)
   then show ?case 
-    using eq_ac.ac_refl by auto
+    using eq_acw.ac_refl by auto
 next
   case (nac_fun f ts gs)
   then show ?case
-    by (simp add: eq_ac.nac_fun)
+    by (simp add: eq_acw.nac_fun)
 next
   case (ac_fun f ts gs)
    have i:
@@ -167,11 +62,10 @@ next
           j \<le> length ts) \<and> 
     (gs ! i \<approx>\<^sub>A\<^sub>C  ts ! j) \<and> (Fun f (remove1 (gs ! i) gs) \<approx>\<^sub>A\<^sub>C  Fun f (remove1 (ts ! j) ts))"
      using ac_fun.IH ac_fun.hyps by blast+
-  then show ?case using eq_ac.ac_fun[OF ac_fun(1)] by auto
+  then show ?case using eq_acw.ac_fun[OF ac_fun(1)] by auto
 qed
 
-
-lemma ac_eq_trans:  \<open>\<lbrakk>s \<approx>\<^sub>A\<^sub>C t ; t \<approx>\<^sub>A\<^sub>C u \<rbrakk> \<Longrightarrow>  s \<approx>\<^sub>A\<^sub>C u\<close>
+lemma ac_eq_trans:  \<open>\<lbrakk>s \<approx>\<^sub>A\<^sub>C\<^sub>w t ; t \<approx>\<^sub>A\<^sub>C\<^sub>w u \<rbrakk> \<Longrightarrow>  s \<approx>\<^sub>A\<^sub>C\<^sub>w u\<close>
   sorry
 
 
@@ -230,6 +124,22 @@ We implement the deduction rules above as follows by destruction on their struct
 
 \<close>
 
+fun dec_acw_cases :: \<open>('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow> bool\<close> where
+  \<open>dec_acw_cases s t = (
+    case (s,t) of
+      (Var x, Var y) \<Rightarrow> (x = y) |
+      (Var _, Fun _ _) \<Rightarrow> False |
+      (Fun _ _, Var _) \<Rightarrow> False |
+      (Fun t ts, Fun g gs) \<Rightarrow> False
+  )\<close>
+
+fun dec_acw :: \<open>('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow> bool\<close> where
+  \<open>dec_acw s t = (
+    if (dec_is_flattened s & dec_is_flattened t) then
+      dec_acw_cases s t
+    else
+      False
+  )\<close>
 
 function dec_ac :: \<open>('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow> bool\<close> where
   \<open>dec_ac (Var x) (Var y) = (x = y)\<close> |
@@ -256,16 +166,13 @@ function dec_ac :: \<open>('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow
   )\<close>
   by pat_completeness auto
 
-(*
-value "dec_ac (Var 0) (Fun f [Var 0])" (* I don't know why this doesn't compute since this case doesnt'depend on how label is defined... *)
-*)
-
 (* Every term is AC equivalent to its flattened version. *)
 lemma flatten_ac_eq: \<open>(flatten t) \<approx>\<^sub>A\<^sub>C t\<close>
 proof(induct t)
   case (Var x)
   then show ?case
-    using ac_refl by auto
+    apply (simp)
+    by (metis eq_ac_def flatten_soundness signature.ac_eq_refl)
 next
   case (Fun f ts)
   then show ?case 
@@ -285,9 +192,64 @@ next
   qed
 qed
 
+text \<open> Some sanity tests for eq_acw. \<close>
 
+lemma test2 :
+  assumes "label f = AC"
+  shows "Var x \<approx>\<^sub>A\<^sub>C\<^sub>w Var x"
+  apply (rule ac_refl) 
+  apply (rule var_is_flattened)
+  done
 
+lemma test1 : 
+  assumes "label g = Unin "
+  shows "Fun g [Var x] \<approx>\<^sub>A\<^sub>C\<^sub>w Fun g [Var x ]"
+  apply (rule nac_fun)
+      apply (rule fun_is_flattened)
+       apply (simp add: assms)
+      apply (auto)
+    apply (rule fun_is_flattened)
+     apply  (simp add: assms)
+    apply (auto)
+   apply (simp add:assms)
+  apply (rule  ac_refl)
+  apply (rule var_is_flattened)
+  done
+
+lemma test3 : 
+  assumes "label f = AC "
+  shows "flatten (Fun f [Var x, Fun f [Var z, Var y]]) \<approx>\<^sub>A\<^sub>C\<^sub>w flatten (Fun f [Var x, Var y, Var z])"
+  apply (simp add: assms)
+  apply (rule ac_fun)
+  apply (rule ac_is_flattened)
+       apply (simp add: assms)
+  subgoal 1
+    apply (auto)
+    done
+  subgoal 2
+    apply (auto)
+    done 
+    apply (rule ac_is_flattened)
+      apply (simp add: assms)
+  subgoal 1
+    apply (auto)
+    done
+  subgoal 
+    apply (auto)
+    done
+   apply (simp add: assms)
+  apply (rule exI[where x = 0])
+  apply (rule exI[where x = 0])
+  apply (rule conjI)
+   apply (simp)
+  apply (rule conjI)
+   apply (simp)
+  apply (rule conjI)
+   apply (simp)
+   apply (rule ac_refl)
+   apply (simp)
+  apply (simp)
+  apply (rule ac_fun)
+  sorry
 end
-
-
 end

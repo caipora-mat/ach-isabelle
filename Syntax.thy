@@ -369,11 +369,16 @@ proof
   qed
 qed
 
-
-(* or *)
-
 lemma flatten_soundness_dec: \<open>\<forall> t::('f, 'v) term. dec_is_flattened (flatten t)\<close>
   using dec_pred_is_flatten flatten_soundness by fast
+
+lemma flatten_idempotent: \<open>flatten (flatten t) = t\<close>
+  sorry
+
+(* this lemma seems necessary for proofs using equality *)
+lemma flatten_soundess_eq_form: \<open>is_flattened t \<longleftrightarrow> dec_is_flattened t = True\<close>
+  sorry
+
 
 text \<open>O exemplo abaixo está com problema, agora esta certo\<close>
 
