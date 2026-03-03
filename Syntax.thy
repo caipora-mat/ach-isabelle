@@ -31,6 +31,27 @@ inductive is_flattened :: "('f, 'v) term \<Rightarrow> bool" where
        \<And>t. t \<in> set ts \<Longrightarrow> is_flattened t;
        \<And>t g gs. t \<in> set ts \<Longrightarrow> t = Fun g gs \<Longrightarrow> g \<noteq> f \<rbrakk>  \<Longrightarrow> is_flattened (Fun f ts)"
 
+lemma constants_flattened:
+  shows "is_flattened (Fun f [])"
+  using ac_is_flattened empty_iff empty_set fun_is_flattened by metis
+
+
+lemma fun_flattened_is_flattened:
+  assumes "is_flattened s"
+  shows "is_flattened (Fun f [s])"
+  using assms
+proof(induct rule: is_flattened.induct)
+  case (var_is_flattened x)
+  then show ?case sorry
+next
+  case (fun_is_flattened g ts)
+  then show ?case sorry
+next
+  case (ac_is_flattened g ts)
+  then show ?case sorry
+qed
+
+
 lemma test1_is_flattened:
   assumes "label f = Unin"
   shows "is_flattened (Fun f [Var x, Fun f [Var y, Var x]])"
@@ -370,7 +391,7 @@ proof
 qed
 
 lemma flatten_soundness_dec: \<open>\<forall> t::('f, 'v) term. dec_is_flattened (flatten t)\<close>
-  using dec_pred_is_flatten flatten_soundness by fast
+  using dec_pred_is_flatten flatten_soundness by auto
 
 lemma flatten_idempotent: \<open>flatten (flatten t) = t\<close>
   sorry

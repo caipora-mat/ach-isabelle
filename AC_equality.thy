@@ -38,6 +38,11 @@ inductive_cases AC_eqw_elims:
   "t \<approx>\<^sub>A\<^sub>C\<^sub>w t"
   "(Fun f ts) \<approx>\<^sub>A\<^sub>C\<^sub>w (Fun f gs)"
 
+lemma acw_eq_isflattened:
+  assumes "s \<approx>\<^sub>A\<^sub>C\<^sub>w t"
+  shows "is_flattened s" "is_flattened t"
+  using assms by (induct rule: eq_acw.induct) auto
+
 text \<open> Next, we have to prove that this inductive relation is indeed an equivalent relation. \<close>
 
 lemma ac_eq_refl:
@@ -63,7 +68,7 @@ next
     (Fun f (remove1 (gs ! i) gs) \<approx>\<^sub>A\<^sub>C\<^sub>w Fun f (remove1 (ts ! j) ts)
    )"
      using ac_fun.IH ac_fun.hyps by blast+
-  then show ?case using eq_acw.ac_fun[OF ac_fun(1)] by sorry
+  then show ?case using eq_acw.ac_fun[OF ac_fun(2,1,3)] by simp
 qed
 
 lemma ac_eq_trans:  \<open>\<lbrakk>s \<approx>\<^sub>A\<^sub>C\<^sub>w t ; t \<approx>\<^sub>A\<^sub>C\<^sub>w u \<rbrakk> \<Longrightarrow>  s \<approx>\<^sub>A\<^sub>C\<^sub>w u\<close>
@@ -77,29 +82,40 @@ proof (induction s)
 next
   case (Fun f ts)
   then show ?case sorry
-qed
+qed                                  
 
-lemma ac_eq_fun: 
-  assumes \<open>s \<approx>\<^sub>A\<^sub>C t\<close>
-  shows \<open>(Fun f [s]) \<approx>\<^sub>A\<^sub>C (Fun f [t])\<close>
-proof(cases "label f = AC")
-  case True
-   have i: "length [s] = length [t]" by simp
-   have "\<exists> i j.
-       (i \<le>length [s] \<and> j \<le> length [t]) \<and> [s] ! i \<approx>\<^sub>A\<^sub>C  [t] ! j \<and> Fun f (remove1 ([s] ! i) [s]) \<approx>\<^sub>A\<^sub>C  Fun f (remove1 ([t] ! j) [t])"
-    using assms ac_refl by force
-   with i show ?thesis using ac_fun[OF True] by sorry
-next
-  case False
+lemma ac_eqw_fun: 
+  assumes \<open>s \<approx>\<^sub>A\<^sub>C\<^sub>w t\<close>
+  shows \<open>(Fun f [s]) \<approx>\<^sub>A\<^sub>C\<^sub>w (Fun f [t])\<close>
+  using assms
+proof-
+  have flattened: "is_flattened (Fun f [s])" "is_flattened (Fun f [t])"
+    using acw_eq_isflattened[OF assms] fun_flattened_is_flattened by auto
+  show "(Fun f [s]) \<approx>\<^sub>A\<^sub>C\<^sub>w (Fun f [t])"
+  proof(cases "label f = AC")
+    case True
+    have "s \<approx>\<^sub>A\<^sub>C\<^sub>w t" by fact
+    moreover have "Fun f [] \<approx>\<^sub>A\<^sub>C\<^sub>w Fun f []" 
+      using ac_refl constants_flattened[of f] by auto
+    hence "Fun f (remove1 ([s] ! 0) [s]) \<approx>\<^sub>A\<^sub>C\<^sub>w  Fun f (remove1 ([t] ! 0) [t])"
+      by simp
+    ultimately have i: "\<exists> i j.
+       (i < length [s] \<and> j < length [t]) \<and> [s] ! i \<approx>\<^sub>A\<^sub>C\<^sub>w  [t] ! j \<and> Fun f (remove1 ([s] ! i) [s]) \<approx>\<^sub>A\<^sub>C\<^sub>w  Fun f (remove1 ([t] ! j) [t])"
+       using assms eq_acw.simps is_flattened.simps by simp
+    show ?thesis using ac_fun[OF flattened True] i by simp
+  next
+    case False
     have i: "length [s] = length [t]" by simp
-    have "\<And>i. i < length [s] \<Longrightarrow> [s]!i \<approx>\<^sub>A\<^sub>C [t]!i" 
+    have ii: "\<And>i. i < length [s] \<Longrightarrow> [s]!i \<approx>\<^sub>A\<^sub>C\<^sub>w [t]!i" 
       using assms ac_refl by simp
-    with i show ?thesis using nac_fun[OF False i] by sorry
+    with i show ?thesis using nac_fun[OF flattened False i] by simp
   qed
+qed
 
 section \<open>Decidability of AC equality \<close>
 
 text \<open>The functions below will be moved to another file, with proper generalizations.\<close>
+
 fun fmap :: \<open>('a \<Rightarrow> 'b) \<Rightarrow> 'a option \<Rightarrow> 'b option\<close> (infixl \<open><$>\<close> 70) where
   \<open>fmap f None = None\<close> |
   \<open>fmap f (Some x) = Some (f x)\<close>
@@ -174,13 +190,13 @@ next
   next
     case False
     have lengths: "length (map flatten ts) = length ts"
-      by simp
+      sorry
     have i: "flatten (Fun f ts) = Fun f (map flatten ts)"
-      using flatten.simps False non_ac by force
+      using flatten.simps False non_ac sorry
     from Fun nac_fun[OF False lengths] 
     have "Fun f (map flatten ts) \<approx>\<^sub>A\<^sub>C Fun f ts"
-      using nth_mem by fastforce
-    with i show ?thesis by auto
+      using nth_mem sorry
+    with i show ?thesis sorry
   qed
 qed
 
