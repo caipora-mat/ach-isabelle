@@ -21,7 +21,7 @@ fun unordered_pred_all :: "('a \<Rightarrow> 'b \<Rightarrow> bool) \<Rightarrow
                                                  )
                                         )"
 
-fun equal :: "('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow> bool" where
+function equal :: "('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow> bool" where
  "equal t1 t2 = (case (t1, t2) of  
                  (Var x, Var y) \<Rightarrow> x=y |
                  (Var x, Fun _ _) \<Rightarrow> False |
@@ -39,7 +39,7 @@ fun equal :: "('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow> bool" wher
                                           else
                                             False)
                   )"
-
+  by pat_completeness auto
 
 text \<open>Equality modulo ACh: 
 (x \<oplus> y) \<oplus> z = x \<oplus> (y \<oplus> z),
