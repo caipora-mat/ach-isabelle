@@ -25,12 +25,12 @@ inductive eq_acw :: \<open>('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarro
           is_flattened (Fun f ts);
           label f = AC ;
           \<exists> i j. (
-            i \<le> length ss \<and>
-            j \<le> length ts \<and>
+            i < length ss \<and>
+            j < length ts \<and>
             (ss!i) \<approx>\<^sub>A\<^sub>C\<^sub>w (ts!j) \<and>
             (Fun f (remove1 (ss!i) ss)) \<approx>\<^sub>A\<^sub>C\<^sub>w (Fun f (remove1 (ts!j) ts))
           )
-          \<rbrakk> \<Longrightarrow> (Fun f ss) \<approx>\<^sub>A\<^sub>C\<^sub>w (Fun f gs)\<close>
+          \<rbrakk> \<Longrightarrow> (Fun f ss) \<approx>\<^sub>A\<^sub>C\<^sub>w (Fun f ts)\<close>
 
 definition eq_ac :: \<open>('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow> bool\<close> ("_ \<approx>\<^sub>A\<^sub>C  _" [80,80] 80)
   where "eq_ac t1 t2 \<equiv> (flatten t1) \<approx>\<^sub>A\<^sub>C\<^sub>w (flatten t2)"
@@ -51,18 +51,20 @@ proof (induction rule: eq_acw.induct)
   case (ac_refl t)
   then show ?case 
     using eq_acw.ac_refl by auto
-next
-  case (nac_fun f ts gs)
+next case (nac_fun f ts gs)
   then show ?case
     by (simp add: eq_acw.nac_fun)
 next
   case (ac_fun f ts gs)
    have i:
-   "\<exists> i j.  (i \<le> length gs \<and>
-          j \<le> length ts) \<and> 
-    (gs ! i \<approx>\<^sub>A\<^sub>C  ts ! j) \<and> (Fun f (remove1 (gs ! i) gs) \<approx>\<^sub>A\<^sub>C  Fun f (remove1 (ts ! j) ts))"
+   "\<exists> i j. (
+    i < length gs \<and> 
+    j < length ts) \<and> 
+    (gs ! i \<approx>\<^sub>A\<^sub>C\<^sub>w  ts ! j) \<and> 
+    (Fun f (remove1 (gs ! i) gs) \<approx>\<^sub>A\<^sub>C\<^sub>w Fun f (remove1 (ts ! j) ts)
+   )"
      using ac_fun.IH ac_fun.hyps by blast+
-  then show ?case using eq_acw.ac_fun[OF ac_fun(1)] by auto
+  then show ?case using eq_acw.ac_fun[OF ac_fun(1)] by sorry
 qed
 
 lemma ac_eq_trans:  \<open>\<lbrakk>s \<approx>\<^sub>A\<^sub>C\<^sub>w t ; t \<approx>\<^sub>A\<^sub>C\<^sub>w u \<rbrakk> \<Longrightarrow>  s \<approx>\<^sub>A\<^sub>C\<^sub>w u\<close>
@@ -124,13 +126,56 @@ We implement the deduction rules above as follows by destruction on their struct
 
 \<close>
 
+text \<open>The functions below will be moved to another file, with proper generalizations.\<close>
+fun fmap :: \<open>('a \<Rightarrow> 'b) \<Rightarrow> 'a option \<Rightarrow> 'b option\<close> (infixl \<open><$>\<close> 70) where
+  \<open>fmap f None = None\<close> |
+  \<open>fmap f (Some x) = Some (f x)\<close>
+
+fun pure :: \<open>'a \<Rightarrow> 'a option\<close> where
+  \<open>pure x = Some x\<close>
+
+fun app :: \<open>('a \<Rightarrow> 'b) option \<Rightarrow> 'a option \<Rightarrow> 'b option\<close> where
+  \<open>app None _ = None\<close> |
+  \<open>app (Some f) x = fmap f x\<close>
+
+text \<open>find_index P xs is the first index i, with 0 <= i < lenght xs, such that P (xs!i).
+Notice that this is a witness for an existential quantifier over a decidable predicate P.
+As such, it can happen that the list have more than one such element.
+\<close>
+
+fun find_index :: \<open>('a \<Rightarrow> bool) \<Rightarrow> 'a list \<Rightarrow> nat option\<close> where
+  \<open>find_index P xs = (
+    case xs of
+      []   \<Rightarrow> None |
+      x#xs \<Rightarrow> None
+  )\<close>
+
+text \<open>dec_find_inces P xs ys is Some (x,y) if there exists x \<in> set xs and y \<in> set ys with P x y.
+It is None otherwise.
+\<close>
+fun dec_find_witness :: \<open>('a \<Rightarrow> 'b \<Rightarrow> bool) \<Rightarrow> 'a list \<Rightarrow> 'b list \<Rightarrow> ('a * 'b) option\<close> where
+  \<open>dec_find_witness P xs ys = (
+    case xs of
+      [] \<Rightarrow> None |
+      x#xs \<Rightarrow> (
+        case (find (P x) ys) of
+        None \<Rightarrow> dec_find_witness P xs ys |
+        Some y \<Rightarrow> Some (x,y)
+      )
+)\<close>
+
 fun dec_acw_cases :: \<open>('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow> bool\<close> where
   \<open>dec_acw_cases s t = (
     case (s,t) of
-      (Var x, Var y) \<Rightarrow> (x = y) |
-      (Var _, Fun _ _) \<Rightarrow> False |
-      (Fun _ _, Var _) \<Rightarrow> False |
-      (Fun t ts, Fun g gs) \<Rightarrow> False
+      (Var x, Var y)   \<Rightarrow> (x = y) |
+      (Var _, Fun _ _) \<Rightarrow> False   |
+      (Fun _ _, Var _) \<Rightarrow> False   |
+      (Fun f ss, Fun g gs) \<Rightarrow> (
+        if f = g then
+          False
+        else
+          False
+      )
   )\<close>
 
 fun dec_acw :: \<open>('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow> bool\<close> where
