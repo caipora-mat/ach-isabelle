@@ -12,7 +12,7 @@ locale signature =
 
 begin
 
-lemma non_ac : 
+lemma non_ac :
   assumes \<open>label f \<noteq> AC\<close>
   shows \<open>label f = Unin \<or> label f = Hom\<close>
   using ach.exhaust assms by blast
@@ -30,6 +30,48 @@ inductive is_flattened :: "('f, 'v) term \<Rightarrow> bool" where
     "\<lbrakk> label f = AC;
        \<And>t. t \<in> set ts \<Longrightarrow> is_flattened t;
        \<And>t g gs. t \<in> set ts \<Longrightarrow> t = Fun g gs \<Longrightarrow> g \<noteq> f \<rbrakk>  \<Longrightarrow> is_flattened (Fun f ts)"
+
+lemma constants_flattened:
+  shows "is_flattened (Fun f [])"
+  using ac_is_flattened empty_iff empty_set fun_is_flattened by metis
+
+
+lemma fun_flattened_is_flattened:
+  assumes "is_flattened s"
+  shows "is_flattened (Fun f [s])"
+  using assms
+proof(induct rule: is_flattened.induct)
+  case (var_is_flattened x)
+  then show ?case sorry
+next
+  case (fun_is_flattened g ts)
+  then show ?case sorry
+next
+  case (ac_is_flattened g ts)
+  then show ?case sorry
+qed
+
+
+lemma test1_is_flattened:
+  assumes "label f = Unin"
+  shows "is_flattened (Fun f [Var x, Fun f [Var y, Var x]])"
+  by (metis ach.simps(2) assms empty_set fun_is_flattened list.simps(15) set_ConsD singletonD
+      var_is_flattened)
+
+
+lemma test2_is_flattened:
+  assumes "label f = AC"
+  shows "\<not> is_flattened (Fun f [Var x, Fun f [Var y, Var x]])"
+  using assms signature.is_flattened.cases by force
+
+value  "set [Var x, Fun g [Fun f [Var y, Var x], Var x]]"
+
+lemma example2:
+  assumes "label f = AC" and "label g = Unin"
+  shows "is_flattened (Fun f [Var x, Fun g [Fun f [Var y, Var x], Var x]])"
+  sorry
+
+(* Now we define a function that decides the above predicate *)
 
 fun is_headed_by_ac :: \<open>('f, 'v) term \<Rightarrow> bool\<close> where
   \<open>is_headed_by_ac (Var _)   = False\<close> |
@@ -229,7 +271,7 @@ proof
       case True
       have a: "flatten (Fun f ss) = Fun f (concat (map (flatten_aux f) (map flatten ss)))"
         using True by simp
-      show ?thesis 
+      show ?thesis
         apply (subst a)
         apply(rule is_flattened.ac_is_flattened)
       proof-
@@ -254,7 +296,10 @@ proof
 qed
 
 lemma flatten_soundness_dec: \<open>\<forall> t::('f, 'v) term. dec_is_flattened (flatten t)\<close>
-  using dec_pred_is_flatten flatten_soundness by blast
+  using dec_pred_is_flatten flatten_soundness by auto
+
+lemma flatten_idempotent: \<open>flatten (flatten t) = t\<close>
+  sorry
 
 (* this lemma seems necessary for proofs using equality *)
 lemma flatten_soundess_eq_form: \<open>is_flattened t \<longleftrightarrow> dec_is_flattened t = True\<close>
