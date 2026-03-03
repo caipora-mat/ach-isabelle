@@ -84,6 +84,15 @@ next
   then show ?case sorry
 qed                                  
 
+(* 
+
+      s1 \<approx> t1, ..., sn \<approx> tn
+    -----------------------------
+      f(s1,...,sn) \<approx> f(t1, ..., tn)
+
+*)
+
+
 lemma ac_eqw_fun: 
   assumes \<open>s \<approx>\<^sub>A\<^sub>C\<^sub>w t\<close>
   shows \<open>(Fun f [s]) \<approx>\<^sub>A\<^sub>C\<^sub>w (Fun f [t])\<close>
@@ -127,6 +136,8 @@ fun app :: \<open>('a \<Rightarrow> 'b) option \<Rightarrow> 'a option \<Rightar
   \<open>app None _ = None\<close> |
   \<open>app (Some f) x = fmap f x\<close>
 
+term \<open>(+) <$> pure 3\<close>
+
 text \<open>dec_find_inces P xs ys is Some (x,y) if there exists x \<in> set xs and y \<in> set ys such that P x y.
 It is None otherwise.
 \<close>
@@ -148,7 +159,7 @@ lemma dec_find_witness_exist:
 
 function dec_acw :: \<open>('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow> bool\<close> where
   \<open>dec_acw s t = (
-    if (dec_is_flattened s & dec_is_flattened t) then
+    if (dec_is_flattened s \<and> dec_is_flattened t) then
       (case (s,t) of
         (Var x, Var y)   \<Rightarrow> (x = y) |
         (Var _, Fun _ _) \<Rightarrow> False   |
@@ -162,7 +173,11 @@ function dec_acw :: \<open>('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarro
                   None \<Rightarrow> False |
                   Some (s,t) \<Rightarrow> dec_acw (Fun f (remove1 s ss)) (Fun g (remove1 t ts))
               )|
-                _ \<Rightarrow> foldl (\<and>) True (map (\<lambda> (x,y). dec_acw x y) (zip ss ts))
+                _ \<Rightarrow>
+              (if (length ss = length ts) then
+                  foldl (\<and>) True (map (\<lambda> (x,y). dec_acw x y) (zip ss ts))
+                else
+                  False)
           else
             False
         )

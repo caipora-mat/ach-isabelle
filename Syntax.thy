@@ -35,44 +35,6 @@ lemma constants_flattened:
   shows "is_flattened (Fun f [])"
   using ac_is_flattened empty_iff empty_set fun_is_flattened by metis
 
-
-lemma fun_flattened_is_flattened:
-  assumes "is_flattened s"
-  shows "is_flattened (Fun f [s])"
-  using assms
-proof(induct rule: is_flattened.induct)
-  case (var_is_flattened x)
-  then show ?case sorry
-next
-  case (fun_is_flattened g ts)
-  then show ?case sorry
-next
-  case (ac_is_flattened g ts)
-  then show ?case sorry
-qed
-
-
-lemma test1_is_flattened:
-  assumes "label f = Unin"
-  shows "is_flattened (Fun f [Var x, Fun f [Var y, Var x]])"
-  by (metis ach.simps(2) assms empty_set fun_is_flattened list.simps(15) set_ConsD singletonD
-      var_is_flattened)
-
-
-lemma test2_is_flattened:
-  assumes "label f = AC"
-  shows "\<not> is_flattened (Fun f [Var x, Fun f [Var y, Var x]])"
-  using assms signature.is_flattened.cases by force
-
-value  "set [Var x, Fun g [Fun f [Var y, Var x], Var x]]"
-
-lemma example2:
-  assumes "label f = AC" and "label g = Unin"
-  shows "is_flattened (Fun f [Var x, Fun g [Fun f [Var y, Var x], Var x]])"
-  sorry
-
-(* Now we define a function that decides the above predicate *)
-
 fun is_headed_by_ac :: \<open>('f, 'v) term \<Rightarrow> bool\<close> where
   \<open>is_headed_by_ac (Var _)   = False\<close> |
   \<open>is_headed_by_ac (Fun g _) = (
@@ -296,14 +258,7 @@ proof
 qed
 
 lemma flatten_soundness_dec: \<open>\<forall> t::('f, 'v) term. dec_is_flattened (flatten t)\<close>
-  using dec_pred_is_flatten flatten_soundness by auto
-
-lemma flatten_idempotent: \<open>flatten (flatten t) = t\<close>
-  sorry
-
-(* this lemma seems necessary for proofs using equality *)
-lemma flatten_soundess_eq_form: \<open>is_flattened t \<longleftrightarrow> dec_is_flattened t = True\<close>
-  sorry
+  using dec_pred_is_flatten flatten_soundness oops
 
 lemma flatten_idempotent: \<open>flatten (flatten t) = flatten t\<close>
 proof (induct t)
@@ -314,6 +269,7 @@ next
   then show ?case
   proof (cases \<open>label f = AC\<close>)
     case True
+    have H1:\<open>label f = AC\<close> by fact
     then show ?thesis
       sorry
   next
