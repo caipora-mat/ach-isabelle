@@ -8,8 +8,7 @@ context signature
 
 begin
 
-inductive eq_acw :: \<open>('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow> bool\<close> ("_ \<approx>\<^sub>A\<^sub>C\<^sub>w  _" [80,80] 80) 
-  where 
+inductive eq_acw :: \<open>('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow> bool\<close> ("_ \<approx>\<^sub>A\<^sub>C\<^sub>w  _" [80,80] 80) where 
   ac_refl: \<open>\<lbrakk>is_flattened t\<rbrakk> \<Longrightarrow> t \<approx>\<^sub>A\<^sub>C\<^sub>w t\<close> |
 
   nac_fun: \<open>\<lbrakk>
@@ -35,9 +34,9 @@ inductive eq_acw :: \<open>('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarro
 definition eq_ac :: \<open>('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow> bool\<close> ("_ \<approx>\<^sub>A\<^sub>C  _" [80,80] 80)
   where "eq_ac t1 t2 \<equiv> (flatten t1) \<approx>\<^sub>A\<^sub>C\<^sub>w (flatten t2)"
 
-inductive_cases AC_equ_elims:
-"t \<approx>\<^sub>A\<^sub>C\<^sub>w t"
-"(Fun f ts) \<approx>\<^sub>A\<^sub>C\<^sub>w (Fun f gs)"
+inductive_cases AC_eqw_elims:
+  "t \<approx>\<^sub>A\<^sub>C\<^sub>w t"
+  "(Fun f ts) \<approx>\<^sub>A\<^sub>C\<^sub>w (Fun f gs)"
 
 text \<open> Next, we have to prove that this inductive relation is indeed an equivalent relation. \<close>
 
@@ -71,7 +70,7 @@ lemma ac_eq_trans:  \<open>\<lbrakk>s \<approx>\<^sub>A\<^sub>C\<^sub>w t ; t \<
   sorry
 
 
-lemma ac_eq_subst: \<open> s \<approx>\<^sub>A\<^sub>C t \<Longrightarrow>  (s \<cdot> \<sigma>) \<approx>\<^sub>A\<^sub>C (t \<cdot> \<sigma>)\<close>
+lemma ac_eq_subst: \<open> s \<approx>\<^sub>A\<^sub>C\<^sub>w t \<Longrightarrow>  (s \<cdot> \<sigma>) \<approx>\<^sub>A\<^sub>C\<^sub>w (t \<cdot> \<sigma>)\<close>
 proof (induction s)
   case (Var x)
   then show ?case sorry
@@ -79,13 +78,6 @@ next
   case (Fun f ts)
   then show ?case sorry
 qed
- 
-
-(* Question 1: is this really closure for \<Sigma>-operations when the arguments are lists?
-  I'm thinking I have to say something like: \<forall> t \<in> set ts. ... 
-  Question 2: perhaps we can put closure for \<Sigma>-operations and substitutions as axioms?
-*)
-
 
 lemma ac_eq_fun: 
   assumes \<open>s \<approx>\<^sub>A\<^sub>C t\<close>
@@ -96,35 +88,16 @@ proof(cases "label f = AC")
    have "\<exists> i j.
        (i \<le>length [s] \<and> j \<le> length [t]) \<and> [s] ! i \<approx>\<^sub>A\<^sub>C  [t] ! j \<and> Fun f (remove1 ([s] ! i) [s]) \<approx>\<^sub>A\<^sub>C  Fun f (remove1 ([t] ! j) [t])"
     using assms ac_refl by force
-   with i show ?thesis using ac_fun[OF True] by blast
+   with i show ?thesis using ac_fun[OF True] by sorry
 next
   case False
     have i: "length [s] = length [t]" by simp
     have "\<And>i. i < length [s] \<Longrightarrow> [s]!i \<approx>\<^sub>A\<^sub>C [t]!i" 
       using assms ac_refl by simp
-    with i show ?thesis using nac_fun[OF False i] by simp
-qed
-
-
-(*If t = f (t1,...,tn) and  t1 \<approx>AC t1' 
-
-then f(t1,...,tn)\<approx>AC f(t1',...,tn')
-*)
+    with i show ?thesis using nac_fun[OF False i] by sorry
+  qed
 
 section \<open>Decidability of AC equality \<close>
-
-text \<open>The purpose of this function is to then algorithimically decide the relation above.
-
-We implement the deduction rules above as follows by destruction on their structure:
-1. Two Vars are equal if they underlying names are equal.
-  - It is sound because we can never show x = y with x \<noteq> y using reflexivity.
-2. Compare whenever we have a variable and a function, those are all false.
-
-3. We compare when the two terms are of the shape: (Fun f ts) (Fun g gs)
-
-  
-
-\<close>
 
 text \<open>The functions below will be moved to another file, with proper generalizations.\<close>
 fun fmap :: \<open>('a \<Rightarrow> 'b) \<Rightarrow> 'a option \<Rightarrow> 'b option\<close> (infixl \<open><$>\<close> 70) where
@@ -138,19 +111,7 @@ fun app :: \<open>('a \<Rightarrow> 'b) option \<Rightarrow> 'a option \<Rightar
   \<open>app None _ = None\<close> |
   \<open>app (Some f) x = fmap f x\<close>
 
-text \<open>find_index P xs is the first index i, with 0 <= i < lenght xs, such that P (xs!i).
-Notice that this is a witness for an existential quantifier over a decidable predicate P.
-As such, it can happen that the list have more than one such element.
-\<close>
-
-fun find_index :: \<open>('a \<Rightarrow> bool) \<Rightarrow> 'a list \<Rightarrow> nat option\<close> where
-  \<open>find_index P xs = (
-    case xs of
-      []   \<Rightarrow> None |
-      x#xs \<Rightarrow> None
-  )\<close>
-
-text \<open>dec_find_inces P xs ys is Some (x,y) if there exists x \<in> set xs and y \<in> set ys with P x y.
+text \<open>dec_find_inces P xs ys is Some (x,y) if there exists x \<in> set xs and y \<in> set ys such that P x y.
 It is None otherwise.
 \<close>
 fun dec_find_witness :: \<open>('a \<Rightarrow> 'b \<Rightarrow> bool) \<Rightarrow> 'a list \<Rightarrow> 'b list \<Rightarrow> ('a * 'b) option\<close> where
@@ -164,52 +125,37 @@ fun dec_find_witness :: \<open>('a \<Rightarrow> 'b \<Rightarrow> bool) \<Righta
       )
 )\<close>
 
-fun dec_acw_cases :: \<open>('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow> bool\<close> where
-  \<open>dec_acw_cases s t = (
-    case (s,t) of
-      (Var x, Var y)   \<Rightarrow> (x = y) |
-      (Var _, Fun _ _) \<Rightarrow> False   |
-      (Fun _ _, Var _) \<Rightarrow> False   |
-      (Fun f ss, Fun g gs) \<Rightarrow> (
-        if f = g then
-          False
-        else
-          False
-      )
-  )\<close>
+lemma dec_find_witness_exist:
+  assumes \<open>dec_find_witness P xs ys = Some (x,y)\<close>
+  shows \<open>\<exists> i j.(i < length xs \<and> j < length ys \<and> xs!i = x \<and> ys!j = y \<and> P (xs!i) (ys!j))\<close>
+  sorry
 
-fun dec_acw :: \<open>('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow> bool\<close> where
+function dec_acw :: \<open>('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow> bool\<close> where
   \<open>dec_acw s t = (
     if (dec_is_flattened s & dec_is_flattened t) then
-      dec_acw_cases s t
-    else
-      False
-  )\<close>
-
-function dec_ac :: \<open>('f, 'v) term \<Rightarrow> ('f, 'v) term \<Rightarrow> bool\<close> where
-  \<open>dec_ac (Var x) (Var y) = (x = y)\<close> |
-  \<open>dec_ac (Var _) (Fun _ _) = False\<close> |
-  \<open>dec_ac (Fun _ _) (Var _) = False\<close> |
-  \<open>dec_ac (Fun f ts) (Fun g gs) = (
-    if (f = g) \<and> (length ts = length gs) then
-      (if length ts = 0 then
-        True
-      else
-        (case label f of
-          AC \<Rightarrow> (
-            let t0 = hd ts in
-            let eq_exists = find (\<lambda> sj. dec_ac t0 sj) gs  in
-            (case eq_exists of
-              None \<Rightarrow> False |
-              Some sj \<Rightarrow> dec_ac (Fun f (remove1 t0 ts)) (Fun f (remove1 sj gs)))
-          )|
-          _ \<Rightarrow> foldl (\<and>) True (map (\<lambda> (x,y). dec_ac x y) (zip ts gs))
+      (case (s,t) of
+        (Var x, Var y)   \<Rightarrow> (x = y) |
+        (Var _, Fun _ _) \<Rightarrow> False   |
+        (Fun _ _, Var _) \<Rightarrow> False   |
+        (Fun f ss, Fun g ts) \<Rightarrow> (
+          if f = g then
+            case label f of
+              AC \<Rightarrow> (
+                let witness = dec_find_witness dec_acw ss ts in
+                case witness of
+                  None \<Rightarrow> False |
+                  Some (s,t) \<Rightarrow> dec_acw (Fun f (remove1 s ss)) (Fun g (remove1 t ts))
+              )|
+                _ \<Rightarrow> foldl (\<and>) True (map (\<lambda> (x,y). dec_acw x y) (zip ss ts))
+          else
+            False
         )
       )
     else
       False
   )\<close>
   by pat_completeness auto
+
 
 (* Every term is AC equivalent to its flattened version. *)
 lemma flatten_ac_eq: \<open>(flatten t) \<approx>\<^sub>A\<^sub>C t\<close>
@@ -223,7 +169,8 @@ next
   then show ?case 
   proof(cases "label f = AC")
     case True
-    then show ?thesis sorry
+    then show ?thesis
+      apply (simp)
   next
     case False
     have lengths: "length (map flatten ts) = length ts"
