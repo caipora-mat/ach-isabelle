@@ -22,7 +22,8 @@ The theories, in dependency order:
 | Theory | Content | Dissertation |
 |---|---|---|
 | `Equational_Theory.thy` | `=E` as an inductive congruence | Def. 1.11–1.12 |
-| `ACh_Theory.thy` | Signature `+`, `h`; the AC and ACh axioms; n-ary sums | Sec. 1.4 |
+| `AC_Unif/AC_Theory.thy` | Signature `+`; the AC axioms; n-ary sums | Sec. 1.4 |
+| `ACh_Theory.thy` | Extends AC with `h`; the ACh axioms | Sec. 1.4 |
 | `ACh_Normal_Form.thy` | Normal forms modulo ACh, `s ≈ACh t ⟷ nf s = nf t`, and h-height | Def. 1.21 (plus new material) |
 | `Bounded_ACh_Unification.thy` | Triples, the rules of Fig. 2.2, soundness | Ch. 2, Sec. 3.3 |
 | `Bounded_ACh_Completeness.thy` | Bounded solutions, completeness | Sec. 3.4 |
@@ -42,10 +43,9 @@ The theories, in dependency order:
 - is reflexive, symmetric and transitive;
 - is closed under contexts (`cong`).
 
-The identities use their own variable type `'w`, separate from the term variables `'v`.
-
-**Why.** The AC axioms need three distinct variables X, Y, Z (`datatype ax_var`) whatever the
-term variable type is.
+The identities may use a variable type `'w` different from the term variables `'v`. The AC and
+ACh axioms are given by the set of all their instances (e.g. every `s + t ≈ t + s`), so no
+variables are fixed to state them.
 
 ### 1.2 Sums of several terms (`sum_terms`, `ACh_Theory.thy`) — Representation
 

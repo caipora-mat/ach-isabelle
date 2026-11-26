@@ -11,9 +11,8 @@ section \<open>Equational theories\<close>
 text \<open>
   Definition 1.12 of the dissertation: the equational theory \<open>=\<^sub>E\<close> induced by a set \<open>E\<close> of
   identities is the least congruence relation that is closed under substitution and contains \<open>E\<close>.
-  We define it inductively. The variables of the identities live in their own type \<open>'w\<close>,
-  so that, e.g., the AC axioms can be stated with three distinct variables regardless of how
-  many variables the term type \<open>'v\<close> provides.
+  We define it inductively. The identities may use a variable type \<open>'w\<close> different from the
+  one of the terms; the theories AC and ACh give their identities by all their instances.
 \<close>
 
 type_synonym ('f, 'w) identity = "('f, 'w) term \<times> ('f, 'w) term"
@@ -89,5 +88,33 @@ lemma eq_theory_mono:
   using assms(2)
   by (induction rule: eq_theory.induct)
     (use assms(1) in \<open>auto intro: eq_theory.axiom eq_theory.sym eq_theory.trans eq_theory.cong\<close>)
+
+subsection \<open>Equational theories as a locale\<close>
+
+text \<open>
+  A concrete equational theory (e.g. AC or ACh) is an instance of this locale for a fixed set
+  of identities \<open>E\<close>. Interpreting it with a qualifier, e.g.
+  \<^theory_text>\<open>sublocale ac: equational_theory AC_axioms\<close>, provides the facts below as
+  \<open>ac.refl\<close>, \<open>ac.sym\<close>, \<open>ac.subst\<close>, ….
+\<close>
+
+locale equational_theory =
+  fixes E :: "('f, 'w) identity set"
+begin
+
+lemmas axiom = eq_theory.axiom[of _ _ E]
+lemmas refl = eq_theory.refl[of E]
+lemmas sym = eq_theory.sym[of E]
+lemmas trans = eq_theory.trans[of E]
+lemmas cong = eq_theory.cong[of _ _ E]
+lemmas equivp = eq_theory_equivp[of E]
+lemmas cong_list = eq_theory_cong_list[of E]
+lemmas cong1 = eq_theory_cong1[of E]
+lemmas cong2 = eq_theory_cong2[of E]
+lemmas subst = eq_theory_subst[of E]
+lemmas subst_cong = eq_theory_subst_cong[of _ E]
+lemmas subst_both = eq_theory_subst_both[of E]
+
+end
 
 end

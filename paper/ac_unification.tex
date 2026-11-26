@@ -1,0 +1,1091 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{mathtools}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage[margin=2.7cm]{geometry}
+\usepackage{xcolor}
+\usepackage[colorlinks=true,linkcolor=blue!50!black,citecolor=green!40!black,urlcolor=blue!50!black]{hyperref}
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{example}[theorem]{Example}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+
+\newcommand{\isa}[1]{\mbox{\small\texttt{#1}}}
+\newcommand{\Var}{\mathsf{Var}}
+\newcommand{\Fun}{\mathsf{Fun}}
+\newcommand{\vars}{\mathcal{V}\mathit{ar}}
+\newcommand{\eqAC}{\approx}
+\newcommand{\eqE}{=_{E}}
+\newcommand{\nf}{\mathit{nf}}
+\newcommand{\args}{\mathit{args}}
+\newcommand{\mkac}{\mathit{mk}}
+\newcommand{\targs}{\mathit{targs}}
+\newcommand{\fsub}{\mathit{fsub}}
+\newcommand{\Sub}{\mathit{Sub}}
+\newcommand{\key}{\mathit{key}}
+\newcommand{\VNAC}{V_{\mathrm{NAC}}}
+\newcommand{\Vtwo}{V_{>1}}
+\newcommand{\AS}{\mathit{AS}}
+\newcommand{\psize}{\mathit{size}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\mset}[1]{\{\!\{#1\}\!\}}
+\newcommand{\sides}{\mathit{sides}}
+
+\title{A Verified, Terminating and Complete\\ First-Order AC-Unification Algorithm\\ in Isabelle/HOL}
+\author{Guilherme Borges Brand\~ao}
+\date{}
+
+\emergencystretch=3em
+\begin{document}
+\maketitle
+
+\begin{abstract}
+  We present a formalization in Isabelle/HOL of Stickel's algorithm for unification modulo
+  associativity and commutativity (AC), in the form certified in PVS by Ayala-Rinc\'on,
+  Fern\'andez, Silva, Kutsia and Nantes-Sobrinho. The signature may contain any number of AC
+  symbols together with free symbols. The algorithm is parameterized by a solver for homogeneous
+  linear Diophantine systems, specified only by soundness and by the property that its output
+  generates all solutions; we instantiate it with the algorithm of Contejean and Devie, whose
+  correctness and termination are also formalized. We prove that the algorithm always
+  terminates, that every substitution it computes is an AC-unifier, and that every AC-unifier is,
+  modulo AC, an instance of a computed one. Termination is established with the lexicographic
+  measure of the PVS development; the completeness proof replaces the renaming arguments of the
+  paper proofs by a simple invariant on substitutions. The development consists of about 6\,200
+  lines of Isabelle and contains no unproved statements.
+\end{abstract}
+
+\tableofcontents
+
+%======================================================================
+\section{Introduction}
+%======================================================================
+
+Unification modulo an equational theory $E$ asks, given terms $s$ and $t$, for substitutions
+$\sigma$ with $s\sigma =_E t\sigma$. For the theory AC of an associative and commutative symbol
+$f$,
+\[
+  f(x, f(y, z)) \approx f(f(x, y), z), \qquad f(x, y) \approx f(y, x),
+\]
+unification is decidable and finitary: every unifiable problem has a finite complete set of
+unifiers. The classical algorithm is due to Stickel~\cite{Stickel81}; its termination for
+arbitrary (non-ground, nested) problems was first proved by Fages~\cite{Fages87}. The central idea
+is that an equation between two sums
+\[
+  f(s_1, \dots, s_m) \approx^? f(t_1, \dots, t_n)
+\]
+can be solved by counting: if $\sigma$ is a unifier, each argument $s_i\sigma$ and $t_j\sigma$ is a
+sum of ``atoms'', and for each atom the number of times it occurs on both sides must coincide. This
+gives a homogeneous linear Diophantine equation, whose minimal solutions describe the most general
+way to split arguments into sums of fresh variables.
+
+Ayala-Rinc\'on et al.~\cite{AyalaRincon22,AyalaRincon24} certified a version of Stickel's algorithm
+in PVS, including a termination proof based on a lexicographic measure. The Diophantine equations
+there are solved by a bounded enumeration of candidate solutions. This document describes an
+Isabelle/HOL formalization of the same algorithm with the following features.
+
+\begin{itemize}[leftmargin=*]
+  \item The signature contains any number of AC symbols, given by a predicate $\mathit{ac}$, and
+        arbitrary free symbols. No well-formedness condition on terms is needed: an AC symbol used
+        with a number of arguments other than two simply behaves as a free symbol.
+  \item The Diophantine solver is a parameter (an Isabelle locale). We instantiate it with the
+        algorithm of Contejean and Devie~\cite{BCD90,CD94}, which computes exactly the minimal
+        solutions; its correctness and termination are formalized as part of the development.
+  \item We prove termination, soundness and completeness of the algorithm on all inputs.
+\end{itemize}
+
+The formalization builds on the AFP entries \emph{First-Order Terms}~\cite{AFP-FOT},
+\emph{Homogeneous Linear Diophantine Equations}~\cite{AFP-HLDE} and \emph{Farkas' Lemma}~\cite{AFP-Farkas}.
+Section~\ref{sec:prelim} fixes the notation and defines equational theories;
+Section~\ref{sec:ac} studies AC equality through normal forms;
+Section~\ref{sec:dioph} presents the interface to Diophantine solvers and the Contejean--Devie
+algorithm; Section~\ref{sec:alg} describes the unification algorithm;
+Sections~\ref{sec:sound}, \ref{sec:complete} and~\ref{sec:term} prove soundness, completeness and
+termination; Section~\ref{sec:disc} discusses the differences with the PVS development and the
+structure of the formalization.
+
+%======================================================================
+\section{Preliminaries}\label{sec:prelim}
+%======================================================================
+
+\paragraph{Terms and substitutions.}
+Terms are those of the AFP entry \emph{First-Order Terms}: a term is either a variable $\Var\,x$
+or an application $\Fun\,f\,[t_1,\dots,t_n]$ of a function symbol to a list of terms. Symbols have
+no fixed arity. We write $f(t_1, \dots, t_n)$ and simply $x$ for $\Var\,x$ when no confusion
+arises. Variables are natural numbers in the algorithm. A substitution is a function $\sigma$ from
+variables to terms; $t\sigma$ is its application to $t$, and $\sigma\circ\tau$ denotes the
+composition with $t(\sigma\circ\tau) = (t\sigma)\tau$. We write $\vars(t)$ for the set of
+variables of $t$, $\{x \mapsto u\}$ for the substitution that maps $x$ to $u$ and is the identity
+elsewhere, and $|t|$ for the size of $t$.
+
+A \emph{unification problem} is a list of pairs $s \approx^? t$, written $P$. We write
+$\sides(P)$ for the set of terms occurring as a side of an equation in $P$, $\vars(P)$ for the
+set of its variables and $P\sigma$ for the list obtained by applying $\sigma$ to all sides.
+
+\paragraph{Equational theories.}
+A set of identities $E$ is a set of pairs of terms. The equational theory $=_E$ is the least
+congruence that is closed under substitution and contains $E$. We define it inductively by the
+rules
+\[
+  \frac{(l, r)\in E}{l\sigma =_E r\sigma}
+  \qquad
+  \frac{}{t =_E t}
+  \qquad
+  \frac{s =_E t}{t =_E s}
+  \qquad
+  \frac{s =_E t \quad t =_E u}{s =_E u}
+  \qquad
+  \frac{s_i =_E t_i \ (1\le i\le n)}{f(s_1,\dots,s_n) =_E f(t_1,\dots,t_n)}
+\]
+The identities may be stated over a type of variables different from that of the terms; in
+practice we give the identities of AC by \emph{all their instances}, so the axiom rule is
+only used with the identity substitution.
+
+\begin{lemma}[basic properties of $=_E$]\label{lem:eqth}
+  The following hold.
+  \begin{enumerate}[nosep]
+    \item The relation $=_E$ is an equivalence (\isa{eq\_theory\_equivp}).
+    \item If $s =_E t$ then $s\sigma =_E t\sigma$ for every substitution $\sigma$
+          (\isa{eq\_theory\_subst}).
+    \item If $\sigma(x) =_E \tau(x)$ for all $x \in \vars(t)$, then $t\sigma =_E t\tau$
+          (\isa{eq\_theory\_subst\_cong}); combining with 2, if moreover $s =_E t$ then
+          $s\sigma =_E t\tau$ (\isa{eq\_theory\_subst\_both}).
+    \item If $E \subseteq E'$ then $s =_E t$ implies $s =_{E'} t$ (\isa{eq\_theory\_mono}).
+  \end{enumerate}
+\end{lemma}
+
+The proof of 2 is by rule induction; in the axiom case, $(l\tau)\sigma = l(\tau\circ\sigma)$
+is again an instance of the same identity. Item 4 shows, for instance, that AC equality is
+contained in ACh equality, the theory obtained by adding a homomorphism.
+
+A generic locale \isa{equational\_theory} packages these facts, so that each concrete theory
+obtains them under a qualified name (for example \isa{ac.subst} for AC).
+
+%======================================================================
+\section{AC equality}\label{sec:ac}
+%======================================================================
+
+\subsection{Several AC symbols}
+
+The signature is described by a predicate $\mathit{ac}$ on function symbols. For each $f$ with
+$\mathit{ac}(f)$ the identities are all instances of associativity and commutativity:
+\[
+  \mathit{AC}_f = \{ (f(s, f(t, u)),\ f(f(s, t), u)) \} \cup \{ (f(s, t),\ f(t, s)) \},
+\]
+and AC equality $\eqAC$ is the equational theory of $\bigcup_{\mathit{ac}(f)} \mathit{AC}_f$.
+An \emph{AC application} of $f$ is a term $f(a, b)$ with $\mathit{ac}(f)$. The axioms only
+mention binary applications, so an AC symbol applied to a list of length different from two is
+treated exactly as a free symbol; no restriction on the input terms is needed.
+
+\subsection{Normal forms}
+
+To decide $\eqAC$ and to reason about it, we use a canonical representation in which nested
+AC applications are flattened and their arguments are collected in a multiset.
+
+\begin{definition}[normal forms]
+  Normal forms are given by the datatype
+  \[
+    n ::= \mathsf{NV}\,x \mid \mathsf{NF}\,f\,[n_1,\dots,n_k] \mid \mathsf{NA}\,f\,M
+  \]
+  where $M$ is a finite multiset of normal forms. For an AC symbol $f$, the \emph{$f$-arguments}
+  of a normal form are $\nf_f(\mathsf{NA}\,f\,M) = M$ and $\nf_f(n) = \mset{n}$ otherwise. The
+  normal form of a term is
+  \[
+    \nf(x) = \mathsf{NV}\,x, \qquad
+    \nf(f(s,t)) = \mathsf{NA}\,f\,(\nf_f(\nf\,s) + \nf_f(\nf\,t)) \text{ if } \mathit{ac}(f),
+  \]
+  and $\nf(f(t_1,\dots,t_n)) = \mathsf{NF}\,f\,[\nf\,t_1,\dots,\nf\,t_n]$ in all other cases.
+\end{definition}
+
+\begin{theorem}[\isa{eq\_AC\_iff\_nf}]\label{thm:nf}
+  $s \eqAC t$ if and only if $\nf(s) = \nf(t)$.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+  For ``only if'' it suffices to check that both sides of every axiom instance have the same
+  normal form, and that $\nf$ is compatible with the congruence rule; the multiset union makes
+  associativity and commutativity disappear. For ``if'' we proceed by induction on the size of
+  $s$. The interesting case is that of two AC applications of $f$ whose multisets of
+  $f$-arguments coincide: the lists of $f$-arguments of $s$ and $t$ are then permutations of each
+  other up to argument-wise equal normal forms, and the result follows from the induction
+  hypothesis and the fact that a sum does not depend, modulo AC, on the order of its summands.
+\end{proof}
+
+\begin{example}\label{ex:nf}
+  Let $f$ be AC and $g$ free, and write $s + t$ for $f(s,t)$. The terms
+  \[
+    t_1 = (x + g(a)) + x \qquad\text{and}\qquad t_2 = x + (x + g(a))
+  \]
+  both have the normal form $\mathsf{NA}\,f\,\mset{\mathsf{NV}\,x, \mathsf{NV}\,x,
+  \mathsf{NF}\,g\,[\mathsf{NF}\,a\,[\,]]}$, hence $t_1 \eqAC t_2$. On the other hand, the
+  ternary application $f(x, y, z)$ is not an AC application: its normal form is
+  $\mathsf{NF}\,f\,[\mathsf{NV}\,x, \mathsf{NV}\,y, \mathsf{NV}\,z]$, so
+  $f(x,y,z) \not\eqAC f(y,x,z)$. Normal forms also decide AC equality below free symbols:
+  $g(x + y) \eqAC g(y + x)$, but $g(x + y) \not\eqAC g(x) + g(y)$ (the second equation holds
+  in ACh, not in AC).
+\end{example}
+
+Two consequences are used throughout. First, $\eqAC$ preserves the size of terms
+(\isa{eq\_AC\_size}); in particular AC is \emph{regular} and a variable $x$ cannot be
+AC-equal to a term properly containing it, so the occurs check is sound modulo AC. Second, the
+syntactic flattening of a term is well behaved.
+
+\begin{definition}[flattening]
+  For an AC symbol $f$, $\args_f(t)$ is the list of $f$-arguments of $t$:
+  $\args_f(f(s,t)) = \args_f(s) \mathbin{@} \args_f(t)$ and $\args_f(t) = [t]$ if $t$ is not an
+  AC application of $f$. Conversely, $\mkac_f[t_1,\dots,t_n] = f(t_1, f(t_2, \dots f(t_{n-1},
+  t_n)))$ for $n \ge 1$, with $\mkac_f[t] = t$.
+\end{definition}
+
+\begin{lemma}\label{lem:mk}
+  For an AC symbol $f$:
+  \begin{enumerate}[nosep]
+    \item $\mkac_f(\args_f\,t) \eqAC t$ (\isa{mk\_ac\_args});
+    \item if the lists $xs$ and $ys$ are permutations of each other, $\mkac_f\,xs \eqAC \mkac_f\,ys$
+          (\isa{mk\_ac\_perm});
+    \item for non-empty $xs$ and $ys$, $\mkac_f(xs \mathbin{@} ys) \eqAC f(\mkac_f\,xs,
+          \mkac_f\,ys)$ (\isa{mk\_ac\_append});
+    \item $(\mkac_f\,xs)\sigma = \mkac_f(xs\sigma)$, and $\args_f(\mkac_f\,xs) = xs$ if no
+          element of $xs$ is an AC application of $f$;
+    \item $\nf_f(\nf\,t)$ is the multiset of the normal forms of $\args_f(t)$, and
+          $\nf_f(\nf(t\sigma)) = \sum_{u\in\args_f(t)} \nf_f(\nf(u\sigma))$;
+    \item no element of $\args_f(t)$ is an AC application of $f$, and each is strictly smaller
+          than $t$ when $t$ is an AC application of $f$.
+  \end{enumerate}
+\end{lemma}
+
+The left commutativity law $f(a, f(b, c)) \eqAC f(b, f(a, c))$ (\isa{ac\_left\_comm}), derived
+from the two axioms, is the basic tool behind item 2. Regularity of AC gives the following form
+of the occurs check, used in the completeness proof.
+
+\begin{lemma}[occurs check, \isa{size\_subst\_occurs}, \isa{occurs\_not\_unifiable}]\label{lem:occurs}
+  If $x \in \vars(t)$ and $t \neq x$, then $|\delta(x)| < |t\delta|$ for every $\delta$, and
+  consequently $\delta(x) \not\eqAC t\delta$.
+\end{lemma}
+
+%======================================================================
+\section{Homogeneous linear Diophantine systems}\label{sec:dioph}
+%======================================================================
+
+\subsection{The solver interface}
+
+A system is given by a number $n$ of unknowns and a list $A$ of integer rows; a vector
+$y\in\N^n$ is a solution if $r\cdot y = 0$ for every row $r$ of $A$. The unification algorithm
+only needs a list of solutions from which every solution can be obtained as a linear combination
+with natural coefficients. This is captured by a locale.
+
+\begin{definition}[Diophantine solver]
+  A function $\mathit{dsolve}$ returning, for $n$ and $A$, either $\mathit{None}$ or a list $B$ of
+  vectors is a \emph{Diophantine solver} if, whenever $\mathit{dsolve}\,n\,A = \mathit{Some}\,B$,
+  \begin{enumerate}[nosep]
+    \item every $b \in B$ is a solution, and
+    \item every solution $y$ is a combination $y = \sum_i k_i b_i$ of the elements of $B$ with
+          $k_i \in \N$.
+  \end{enumerate}
+\end{definition}
+
+The solver may give up (return $\mathit{None}$); this keeps the interface usable for incomplete
+solvers. The function that always returns $\mathit{None}$ is a (useless) solver. Completeness of
+the unification algorithm requires a \emph{total} solver, i.e., one that never returns
+$\mathit{None}$; soundness and termination hold for any solver.
+
+\begin{lemma}[\isa{minimal\_below}, \isa{Solutions\_gen\_by}]\label{lem:minimal}
+  Every non-zero solution lies pointwise above a minimal non-zero solution. Consequently, every
+  list containing all minimal non-zero solutions generates all solutions.
+\end{lemma}
+
+\begin{proof}
+  The first part is by induction on the sum of the components. For the second, if $y$ is a
+  non-zero solution and $m \le y$ is minimal, then $y - m$ is again a solution (the system is
+  homogeneous) with a smaller sum, so $y = m + (y - m)$ and we conclude by induction.
+\end{proof}
+
+Hence any algorithm that computes a superset of the minimal solutions is a solver. Besides the
+Contejean--Devie algorithm, the development contains two further instances:
+\begin{itemize}[nosep,leftmargin=*]
+  \item a solver by \emph{successive elimination} built on the AFP solver for one equation: the
+        solutions of the first equation are $y = \sum_i \lambda_i b_i$, and the remaining
+        equations become equations in the coefficients $\lambda$ (\isa{dsys\_sol},
+        \isa{dsys\_gen});
+  \item the \emph{bounded enumeration} of PVS as the solver for one equation
+        $a \cdot x = b \cdot y$, extended to systems in the same way: all non-zero vectors whose
+        entries are below Stickel's bound $\max(m,n)\cdot\max_{i,j}\mathrm{lcm}(a_i, b_j)$, which
+        is correct because it dominates Huet's bounds on minimal solutions.
+\end{itemize}
+
+\subsection{The algorithm of Contejean and Devie}
+
+Boudet, Contejean and Devie~\cite{BCD90} generalized Fortenbacher's algorithm for one equation to
+systems $Ax = 0$. Starting from the unit vectors $e_1,\dots,e_n$, a breadth-first search builds
+candidate vectors. A vector $v$ with $Av \neq 0$ may be incremented in coordinate $j$ only if
+\[
+  (C_p)\qquad Av \cdot Ae_j < 0,
+\]
+that is, if the increment moves $Av$ towards $0$; candidates that lie above a solution already
+found are discarded, solutions are collected, and the remaining candidates are expanded. The
+search proceeds level by level: all vectors of the $k$-th frontier have components summing to
+$k$.
+
+\begin{example}\label{ex:cd}
+  Consider the equation $2x = y + z$, that is, $A = (2\ {-1}\ {-1})$. The unit vectors have
+  images $2$, $-1$ and $-1$.
+  \begin{itemize}[nosep,leftmargin=*]
+    \item Level 1: no unit vector is a solution. From $e_1$ (image $2$) we may increment the
+          coordinates with negative image, giving $(1,1,0)$ and $(1,0,1)$; from $e_2$ and $e_3$
+          (image $-1$) only the first coordinate, giving the same two vectors.
+    \item Level 2: $(1,1,0)$ and $(1,0,1)$ have image $1$; they are expanded to $(1,2,0)$,
+          $(1,1,1)$ and $(1,0,2)$.
+    \item Level 3: all three vectors are solutions; the frontier becomes empty.
+  \end{itemize}
+  The result is $[(1,2,0), (1,1,1), (1,0,2)]$, exactly the minimal non-zero solutions.
+  Condition $(C_p)$ pruned, for example, $(2,0,0)$, whose image $4$ is farther from $0$.
+\end{example}
+
+We formalize this algorithm and its correctness:
+
+\begin{theorem}[Propositions 1 and 2 of \cite{BCD90}]
+  If the search stops, the set of vectors it returns is exactly the set of minimal non-zero
+  solutions of $Ax = 0$.
+\end{theorem}
+
+The proof of termination in~\cite{BCD90} uses compactness of $[0,1]^n$ and rational
+approximations. We use instead König's lemma and Gordan's theorem of the alternative, which is a
+consequence of Farkas' lemma~\cite{AFP-Farkas}.
+
+\begin{lemma}[Gordan's alternative, \isa{gordan}]
+  For every set $J$ of coordinates, either there is a non-zero solution $y \in \N^n$ of $Ay = 0$
+  with $y_i = 0$ for $i \notin J$, or there is a rational vector $z$ with $z \cdot Ae_j \ge 1$ for
+  every $j \in J$.
+\end{lemma}
+
+\begin{lemma}[König's lemma for the search, \isa{inf\_branch}]
+  If no level of the search has an empty frontier, there is an infinite sequence
+  $b_0, b_1, \dots$ such that each $b_{k+1}$ is obtained from $b_k$ by an increment allowed by
+  $(C_p)$ at level $k$.
+\end{lemma}
+
+\begin{theorem}[Proposition 3 of \cite{BCD90}]
+  The search always stops. Hence the total function \isa{cd\_solve\_total} computes exactly the
+  minimal solutions, and $\lambda n\,A.\ \mathit{Some}(\mathit{cd\_solve\_total}\ n\ A)$ is a
+  total Diophantine solver.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+  If the search does not terminate, the search tree is infinite and finitely branching, so by
+  König's lemma it has an infinite branch $b_0, b_1, \dots$. Condition $(C_p)$ implies
+  $\lVert A b_k\rVert^2 \le (k+1)\,C$ for a constant $C$. Let $J$ be the set of coordinates that
+  are unbounded along the branch. By Gordan's alternative, either some non-zero solution is
+  supported on $J$, and then the branch eventually lies above it and would have been cut; or
+  there is a vector $z$ with $z \cdot Ae_j \ge 1$ for all $j \in J$, and then $z \cdot Ab_k$ grows
+  linearly in $k$, contradicting the bound on $\lVert Ab_k\rVert$.
+\end{proof}
+
+%======================================================================
+\section{The algorithm}\label{sec:alg}
+%======================================================================
+
+The algorithm works on a problem $P$, the substitution $\sigma$ computed so far, and a natural
+number $\mathit{nv}$ such that all variables in use are smaller than $\mathit{nv}$; fresh
+variables are $\mathit{nv}, \mathit{nv}+1, \dots$. An equation is an \emph{AC pair} if both sides
+are AC applications of the same AC symbol. The algorithm follows the structure of the PVS
+version: equations that are not AC pairs are solved as in syntactic unification; once only AC
+pairs remain, all of them are handled in one \emph{AC round}.
+
+\subsection{Solving one AC equation}
+
+Let $t = f(\dots)$ and $s = f(\dots)$ be AC applications of the same AC symbol $f$, all of whose
+variables are below $\mathit{nv}$.
+
+\begin{enumerate}[leftmargin=*]
+  \item \emph{Elimination of common arguments.} Let $L = \mathrm{mset}(\args_f\,t) -
+        \mathrm{mset}(\args_f\,s)$ and $R = \mathrm{mset}(\args_f\,s) - \mathrm{mset}(\args_f\,t)$.
+        If both are empty, the equation holds modulo AC and it is replaced by nothing.
+  \item \emph{Grouping.} Let $u_1,\dots,u_k$ be the distinct elements of $L$ with multiplicities
+        $a_1,\dots,a_k$, and $v_1,\dots,v_l$ those of $R$ with multiplicities $b_1,\dots,b_l$.
+        Write $w_1,\dots,w_{k+l}$ for $u_1,\dots,u_k,v_1,\dots,v_l$.
+  \item \emph{Diophantine equation.} Solve
+        \[ a_1x_1 + \dots + a_kx_k = b_1y_1 + \dots + b_ly_l \]
+        with the solver, and let $B$ be the list of non-zero solutions returned (empty if the
+        solver gives up).
+  \item \emph{Choice of solutions.} For every sublist $D = [d_0,\dots,d_{p-1}]$ of $B$ that
+        satisfies the constraints of Fages: for each $j$, the column sum
+        $c_j = \sum_i d_i(j)$ is positive, and $c_j = 1$ if $w_j$ is not a variable, produce
+        the equations
+        \[
+          w_j \approx^? \mkac_f\bigl(\underbrace{z_0,\dots,z_0}_{d_0(j)},\ \dots,\
+          \underbrace{z_{p-1},\dots,z_{p-1}}_{d_{p-1}(j)}\bigr)
+          \qquad (1 \le j \le k+l),
+        \]
+        where $z_i = \mathit{nv} + i$ are fresh, and the new bound $\mathit{nv} + p$.
+\end{enumerate}
+
+We call this function $\mathit{solve\_ac}$; it returns a list of alternatives $(C, \mathit{nv}')$.
+
+\begin{lemma}[shape of the alternatives, \isa{solve\_ac\_shape}]\label{lem:shape}
+  For every alternative $(C, \mathit{nv}')$ of $\mathit{solve\_ac}\ f\ t\ s\ \mathit{nv}$:
+  $\mathit{nv} \le \mathit{nv}'$; the left-hand sides of $C$ are distinct elements of
+  $\args_f(t) \mathbin{@} \args_f(s)$, hence none is an AC application of $f$; every right-hand
+  side is either a fresh variable $z$ with $\mathit{nv} \le z < \mathit{nv}'$ or an AC application
+  of $f$ whose $f$-arguments are such variables; and a non-variable left-hand side has a variable
+  right-hand side.
+\end{lemma}
+
+\begin{example}\label{ex:xxyz}
+  Let $+$ be AC and consider $x + x \approx^? y + z$. There are no common arguments;
+  $L = \mset{x, x}$ and $R = \mset{y, z}$ give $w = (x, y, z)$ and the equation
+  $2X = Y + Z$, whose minimal solutions were computed in Example~\ref{ex:cd}:
+  \[
+    b_1 = (1,2,0), \qquad b_2 = (1,1,1), \qquad b_3 = (1,0,2).
+  \]
+  All $w_j$ are variables, so a sublist $D$ is admissible if every column has a positive sum: the
+  column of $Y$ needs $b_1$ or $b_2$, and that of $Z$ needs $b_2$ or $b_3$. This leaves five
+  choices; with fresh variables $z_0, z_1, z_2$ for the elements of $D$ they give:
+  \begin{center}
+  \footnotesize
+  \begin{tabular}{@{}lll@{}}
+    \toprule
+    $D$ & equations $C$ & unifier, on $x, y, z$\\
+    \midrule
+    $[b_2]$ & $x \approx^? z_0,\ y \approx^? z_0,\ z \approx^? z_0$ & $x, y \mapsto z$\\
+    $[b_1, b_2]$ & $x \approx^? z_0 + z_1,\ y \approx^? z_0 + z_0 + z_1,\ z \approx^? z_1$ &
+       $x \mapsto z_0 + z,\ y \mapsto z_0 + z_0 + z$\\
+    $[b_1, b_3]$ & $x \approx^? z_0 + z_1,\ y \approx^? z_0 + z_0,\ z \approx^? z_1 + z_1$ &
+       $x \mapsto z_0 + z_1,\ y \mapsto z_0 + z_0,\ z \mapsto z_1 + z_1$\\
+    $[b_2, b_3]$ & $x \approx^? z_0 + z_1,\ y \approx^? z_0,\ z \approx^? z_0 + z_1 + z_1$ &
+       $x \mapsto y + z_1,\ z \mapsto y + z_1 + z_1$\\
+    $[b_1, b_2, b_3]$ & $x \approx^? z_0 + z_1 + z_2,\ y \approx^? z_0 + z_0 + z_1,$ &
+       $x \mapsto z_0 + z_1 + z_2,\ y \mapsto z_0 + z_0 + z_1,$\\
+       & $z \approx^? z_1 + z_2 + z_2$ & $z \mapsto z_1 + z_2 + z_2$\\
+    \bottomrule
+  \end{tabular}
+  \end{center}
+  The last column is the result of $\mathit{inst}$ described below, which binds a fresh variable
+  on the right to the old variable on the left (so, in the first row, $z_0 := x$, then
+  $x := y$, then $y := z$). Each unifier can be checked by counting: in the third row,
+  $x + x$ and $y + z$ both become $z_0 + z_0 + z_1 + z_1$ modulo AC.
+\end{example}
+
+\begin{example}[the constraints of Fages]\label{ex:fages}
+  Let $+$ be AC, $g$ free and $a$ a constant, and consider $x + g(a) \approx^? y + y$. Now
+  $w = (x, g(a), y)$ with the equation $X_1 + X_2 = 2Y$. The search of Contejean and Devie returns
+  $b_1 = (2,0,1)$, $b_2 = (1,1,1)$ and $b_3 = (0,2,1)$. Since $g(a)$ is not a variable, its
+  column must sum to exactly $1$, which rules out $[b_1]$, $[b_3]$ and every $D$ containing $b_3$.
+  The two admissible choices are
+  \begin{align*}
+    [b_2]:\ &\ x \approx^? z_0,\ g(a) \approx^? z_0,\ y \approx^? z_0,\\
+            &\ \text{giving } x \mapsto g(a),\ y \mapsto g(a);\\
+    [b_1, b_2]:\ &\ x \approx^? z_0 + z_0 + z_1,\ g(a) \approx^? z_1,\ y \approx^? z_0 + z_1,\\
+            &\ \text{giving } x \mapsto z_0 + z_0 + g(a),\ y \mapsto z_0 + g(a).
+  \end{align*}
+  Without the constraint, $[b_3]$ would produce $g(a) \approx^? z_0 + z_0$, which has no
+  solution, since $g(a)$ is not a sum.
+\end{example}
+
+\subsection{Instantiation}
+
+The equations produced by $\mathit{solve\_ac}$ are turned into a substitution by
+$\mathit{inst}$ (the PVS \emph{instantiateStep}), which processes them from left to right.
+An equation $t \approx^? t$ is dropped. An equation $t \approx^? z$ with a variable right-hand
+side binds $z := t$, unless $z \in \vars(t)$, in which case the alternative fails; the
+right-hand side is tried first because after an AC step it contains the fresh variables. An
+equation $x \approx^? s$ with $s$ not a variable binds $x := s$ under the same occurs check. An
+equation between two non-variable terms is kept. The result is either a failure or a pair
+$(R, \theta)$ of the kept equations, instantiated, and the computed substitution $\theta$.
+
+\begin{lemma}[properties of instantiation]\label{lem:inst}
+  Let $\mathit{inst}\ E = (R, \theta)$.
+  \begin{enumerate}[nosep]
+    \item $\vars(R) \subseteq \vars(E)$, $\vars(\theta(x)) \subseteq \vars(E) \cup \{x\}$, and
+          $\theta(x) = x$ for $x \notin \vars(E)$ (\isa{inst\_vars}).
+    \item $\theta$ is idempotent: if $w \in \vars(\theta(y))$ then $\theta(w) = w$
+          (\isa{inst\_idem}).
+    \item For every $y$, either $\theta(y)$ is a variable $w$ with $\theta(w) = w$, or
+          $\theta(y) = a\theta$ for some non-variable side $a$ of $E$ (\isa{inst\_img}).
+    \item Every side of $R$ is $a\theta$ for some non-variable side $a$ of $E$ (\isa{inst\_res});
+          and if $\theta(x) \neq x$ then $x$ is a side of $E$ (\isa{inst\_dom}).
+  \end{enumerate}
+\end{lemma}
+
+\subsection{One AC round}
+
+$\mathit{ac\_round}\ P\ R\ \sigma\ \mathit{nv}$ processes the AC pairs of $P$ one by one,
+accumulating the kept equations in $R$:
+\begin{align*}
+  \mathit{ac\_round}\ []\ R\ \sigma\ \mathit{nv} &= [(R, \sigma, \mathit{nv})],\\
+  \mathit{ac\_round}\ ((t \approx^? s) \# P)\ R\ \sigma\ \mathit{nv}
+    &= \bigl[\ r \mid (C, \mathit{nv}') \in \mathit{solve\_ac}\ f\ t\ s\ \mathit{nv},\
+       \mathit{inst}\ C = (R', \theta),\\
+    &\qquad\quad r \in \mathit{ac\_round}\ (P\theta)\ (R\theta \mathbin{@} R')\
+       (\sigma\circ\theta)\ \mathit{nv}' \ \bigr].
+\end{align*}
+
+\subsection{The main loop}
+
+\begin{tabbing}
+  xx\=xx\=xx\=\kill
+  $\mathit{acunif}\ P\ \sigma\ \mathit{nv}$:\\
+  \> if $P = []$ then return $[\sigma]$\\
+  \> else if some equation of $P$ is not an AC pair, let $t \approx^? s$ be the first one and
+     $P_1 = P \setminus \{t \approx^? s\}$:\\
+  \>\> \emph{delete:} if $t = s$, return $\mathit{acunif}\ P_1\ \sigma\ \mathit{nv}$;\\
+  \>\> \emph{eliminate:} if $t = x$ and $x \notin \vars(s)$, return
+       $\mathit{acunif}\ (P_1\{x\mapsto s\})\ (\sigma\circ\{x\mapsto s\})\ \mathit{nv}$;\\
+  \>\> \emph{orient and eliminate:} symmetrically if $s = x$, $t$ is not a variable and
+       $x \notin\vars(t)$;\\
+  \>\> \emph{decompose:} if $t = g(t_1..t_n)$, $s = g(s_1..s_n)$, return
+       $\mathit{acunif}\ ([t_i\approx^?s_i]_i \mathbin{@} P_1)\ \sigma\ \mathit{nv}$;\\
+  \>\> \emph{fail} (occurs check or clash): return $[]$;\\
+  \> else return the concatenation of $\mathit{acunif}\ P'\ \sigma'\ \mathit{nv}'$ for all
+     $(P', \sigma', \mathit{nv}') \in \mathit{ac\_round}\ P\ []\ \sigma\ \mathit{nv}$.
+\end{tabbing}
+
+Decomposition is also used for AC symbols applied to a number of arguments other than two, which
+are not AC pairs.
+
+\begin{example}[a complete run]\label{ex:run}
+  Let $+$ be AC, $g$ free and unary, and $a, b$ constants. On $g(x + y) \approx^? g(a + b)$:
+  \begin{enumerate}[nosep,leftmargin=*]
+    \item The equation is not an AC pair, so it is decomposed into $x + y \approx^? a + b$.
+    \item Only AC pairs remain, so an AC round starts. The arguments give $w = (x, y, a, b)$ and
+          the equation $X_1 + X_2 = Y_1 + Y_2$, whose minimal solutions are the four vectors
+          $p = (1,0,1,0)$, $q = (1,0,0,1)$, $r = (0,1,1,0)$, $s = (0,1,0,1)$, pairing one
+          argument on each side. The columns of the constants $a$ and $b$ must sum to $1$, and
+          those of $x$ and $y$ must be positive; only $[p, s]$ and $[q, r]$ qualify.
+    \item For $[p, s]$ the equations are $x \approx^? z_0$, $y \approx^? z_1$, $a \approx^? z_0$,
+          $b \approx^? z_1$; instantiation gives $z_0 := x$, $z_1 := y$, then $x := a$, $y := b$,
+          and no equation is kept. Likewise $[q, r]$ gives $x := b$, $y := a$.
+    \item Both branches end with the empty problem.
+  \end{enumerate}
+  Hence $\mathit{ac\_unifiers}$ returns two unifiers, $\{x \mapsto a, y \mapsto b\}$ and
+  $\{x \mapsto b, y \mapsto a\}$ (restricted to $x, y$).
+\end{example} The set of AC-unifiers of $s$ and $t$ is
+\[
+  \mathit{ac\_unifiers}\ s\ t = \mathit{acunif}\ [s \approx^? t]\ \mathit{id}\ (1 + \max(\{0\}\cup\vars(s)\cup\vars(t))).
+\]
+
+Since termination is not obvious, $\mathit{acunif}$ is defined in Isabelle as a partial function
+(\isa{function (domintros)}) together with its domain predicate. Soundness and completeness are
+first proved for arguments in the domain, by partial induction; the termination proof of
+Section~\ref{sec:term} shows that every argument is in the domain.
+
+%======================================================================
+\section{Soundness}\label{sec:sound}
+%======================================================================
+
+A substitution $\delta$ \emph{unifies} $P$ if $s\delta \eqAC t\delta$ for every equation
+$s \approx^? t$ of $P$.
+
+\begin{lemma}[soundness of the steps]
+  The following hold.
+  \begin{enumerate}[nosep]
+    \item If $\mathit{inst}\ C = (R, \theta)$ and $\delta$ unifies $R$, then $\theta\circ\delta$
+          unifies $C$.
+    \item If $(C, \mathit{nv}')$ is an alternative of $\mathit{solve\_ac}\ f\ t\ s\ \mathit{nv}$
+          and $\delta$ unifies $C$, then $t\delta \eqAC s\delta$.
+    \item If $(R', \sigma', \mathit{nv}')$ is a result of
+          $\mathit{ac\_round}\ P\ R\ \sigma\ \mathit{nv}$, then $\sigma' = \sigma\circ\theta$ for
+          some $\theta$ such that $\theta\circ\tau$ unifies $P \mathbin{@} R$ whenever $\tau$
+          unifies $R'$.
+  \end{enumerate}
+\end{lemma}
+
+Item 2 is proved with normal forms. Removing the common arguments, it suffices to show that
+every normal form $e$ occurs equally often as an $f$-argument of the instances of the arguments in
+$L$ and in $R$. Each $w_j\delta$ has the same $f$-arguments as the instance of its right-hand
+side, a sum of fresh variables $z_i$ taken $d_i(j)$ times. So both counts are sums, over $i$, of
+the occurrences of $e$ in $z_i\delta$ weighted by $\sum_{j} a_j d_i(j)$ and by
+$\sum_{j} b_j d_i(j)$ respectively, and these weights coincide because each $d_i$ is a
+solution of the Diophantine equation. Theorem~\ref{thm:nf} then gives AC equality.
+
+The other steps are handled by simple facts about unification problems:
+\begin{lemma}
+  The following hold.
+  \begin{enumerate}[nosep]
+    \item $\tau$ unifies $P\sigma$ if and only if $\sigma\circ\tau$ unifies $P$
+          (\isa{unifies\_subst\_eqs});
+    \item if $\tau$ unifies $[t_i \approx^? s_i]_{i}$ with lists of equal length, then $\tau$
+          unifies $g(t_1..t_n) \approx^? g(s_1..s_n)$ (\isa{unifies\_zip});
+    \item if $x \notin \vars(t)$ then $t\{x \mapsto u\} = t$ (\isa{subst\_upd\_not\_in}).
+  \end{enumerate}
+\end{lemma}
+
+\begin{theorem}[\isa{acunif\_sound}]
+  If the computation of $\mathit{acunif}\ P\ \sigma\ \mathit{nv}$ terminates and
+  $\theta$ is one of its results, then $\theta = \sigma\circ\tau$ for some $\tau$ that unifies
+  $P$.
+\end{theorem}
+
+\begin{theorem}[soundness, \isa{ac\_unifiers\_sound}]
+  If $\theta \in \mathit{ac\_unifiers}\ s\ t$ then $s\theta \eqAC t\theta$.
+\end{theorem}
+
+%======================================================================
+\section{Completeness}\label{sec:complete}
+%======================================================================
+
+The paper proofs of completeness of Stickel's algorithm reason about renamings of variables and
+about substitutions \emph{restricted} to the variables of the input. We use a simpler invariant.
+
+\begin{definition}
+  A substitution $\delta$ \emph{AC-fixes} $\theta$ if $\delta(x) \eqAC (\theta(x))\delta$ for every
+  variable $x$.
+\end{definition}
+
+\begin{lemma}[AC-fixing]\label{lem:fixes}
+  The following hold.
+  \begin{enumerate}[nosep]
+    \item Every $\delta$ AC-fixes the identity substitution (\isa{fixes\_ac\_Var}).
+    \item If $\delta(x) \eqAC t\delta$, then $\delta$ AC-fixes $\{x \mapsto t\}$
+          (\isa{fixes\_ac\_upd}).
+    \item If $\delta$ AC-fixes $\sigma$ and $\theta$, it AC-fixes $\sigma\circ\theta$
+          (\isa{fixes\_ac\_compose}).
+    \item If $\delta$ AC-fixes $\theta$, then $u\theta\delta \eqAC u\delta$ for every term $u$
+          (\isa{fixes\_ac\_term}).
+    \item If $\delta$ AC-fixes $\theta$ and unifies $P$, then it unifies $P\theta$
+          (\isa{unifies\_subst\_eqs\_fixes}).
+  \end{enumerate}
+\end{lemma}
+
+Items 2 and 3 cover the variable elimination steps, and item 5 shows that a unifier of the
+problem remains a unifier after instantiation. At the end of a successful run, if $\delta$
+AC-fixes the computed $\theta$, then $\delta(x) \eqAC \theta(x)\delta$ for all $x$, so $\delta$
+is an AC-instance of $\theta$, with $\delta$ itself as the instantiating substitution.
+
+The only steps that create information not present in $\delta$ are the AC steps, which introduce
+fresh variables. The invariant is therefore stated for an extension $\delta'$ of $\delta$ that
+agrees with $\delta$ below the current bound $\mathit{nv}$. We also maintain the invariant
+$\mathit{inv\_vars}$: the variables of the problem are below $\mathit{nv}$, the substitution is
+the identity above $\mathit{nv}$, and it maps variables below $\mathit{nv}$ to terms with
+variables below $\mathit{nv}$.
+
+\begin{lemma}[completeness of instantiation]\label{lem:inst-complete}
+  If $\delta$ unifies $C$, then $\mathit{inst}\ C$ succeeds with some $(R, \theta)$ such that
+  $\delta$ unifies $R$ and AC-fixes $\theta$.
+\end{lemma}
+
+The occurs check never fails here, by Lemma~\ref{lem:occurs}. For decomposition we use:
+
+\begin{lemma}[\isa{decompose\_unifiable}]
+  If $g(t_1..t_n) \approx^? h(s_1..s_m)$ is not an AC pair and is unified by $\delta$, then
+  $g = h$, $n = m$, and $\delta$ unifies $t_i \approx^? s_i$ for every $i$.
+\end{lemma}
+
+The AC step relies on two facts about the Diophantine equation.
+
+\begin{lemma}[\isa{mult\_vector\_sol}, \isa{basis\_gen}]
+  Let $t\delta \eqAC s\delta$ for AC applications $t, s$ of $f$, with $w$, $a$ and $b$ as in the
+  AC step. For every normal form $e$, the vector whose $j$-th component is the number of
+  occurrences of $e$ among the $f$-arguments of $w_j\delta$ solves $a \cdot X = b \cdot Y$. If
+  the solver does not give up, every solution is a combination with natural coefficients of the
+  computed basis.
+\end{lemma}
+
+\begin{lemma}[completeness of an AC step]\label{lem:solve-complete}
+  Assume the solver is total. Let $t$ and $s$ be AC applications of $f$ with variables below
+  $\mathit{nv}$, and $t\delta \eqAC s\delta$. Then $\mathit{solve\_ac}\ f\ t\ s\ \mathit{nv}$ has an
+  alternative $(C, \mathit{nv}')$ with $\mathit{nv} \le \mathit{nv}'$, variables below
+  $\mathit{nv}'$, and a substitution $\delta'$ that agrees with $\delta$ below $\mathit{nv}$ and
+  unifies $C$.
+\end{lemma}
+
+\begin{proof}[Proof sketch]
+  Consider the set $A$ of normal forms $e$ that occur as $f$-arguments of some $w_j\delta$. For
+  each $e \in A$, the vector whose $j$-th component is the number of occurrences of $e$ among the
+  $f$-arguments of $w_j\delta$ is a solution of the Diophantine equation: this is
+  Theorem~\ref{thm:nf} applied to $t\delta \eqAC s\delta$, after removing the common arguments.
+  Since the solver is total, it can be written as $\sum_i c_e(i)\, b_i$ with $c_e(i)\in\N$, where
+  $b_i$ ranges over the computed basis. Let $D$ be the sublist of basis vectors $b_i$ with
+  $c_e(i) > 0$ for some $e\in A$. Choosing for each $e \in A$ a term $\mathit{rep}(e)$ with normal
+  form $e$ that is not an AC application of $f$, define the fresh variable $z_d$ of the $d$-th
+  element of $D$ by
+  \[
+    \delta'(z_d) = \mkac_f\bigl(\text{$\mathit{rep}(e)$ repeated $c_e(i_d)$ times, for each } e \in A\bigr),
+  \]
+  and $\delta' = \delta$ below $\mathit{nv}$. Counting occurrences of each $e$ on both sides shows
+  that $\delta'$ unifies every equation $w_j \approx^? \mkac_f(\dots)$, so by
+  Theorem~\ref{thm:nf} it unifies $C$. The constraints of Fages are satisfied: each $w_j\delta$ has
+  at least one $f$-argument, and a non-variable $w_j$, not being an AC application of $f$, has
+  exactly one.
+\end{proof}
+
+\begin{example}\label{ex:complete}
+  Take $x + x \approx^? y + z$ of Example~\ref{ex:xxyz} and the unifier
+  $\delta = \{x \mapsto a + b,\ y \mapsto a + a,\ z \mapsto b + b\}$, with constants $a$, $b$.
+  The atoms are $a$ and $b$. Counting them in $(x\delta, y\delta, z\delta)$ gives $(1,2,0) = b_1$
+  for $a$ and $(1,0,2) = b_3$ for $b$, so $c_a = (1,0,0)$, $c_b = (0,0,1)$ and $D = [b_1, b_3]$.
+  The construction sets $\delta'(z_0) = a$ and $\delta'(z_1) = b$, and $\delta'$ unifies the
+  equations $x \approx^? z_0 + z_1$, $y \approx^? z_0 + z_0$, $z \approx^? z_1 + z_1$ of that
+  alternative. Instantiation produces $\theta = \{x \mapsto z_0 + z_1,\ y \mapsto z_0 + z_0,\
+  z \mapsto z_1 + z_1\}$, and indeed $\delta(x) \eqAC \theta(x)\delta'$ for all variables: e.g.\
+  $\theta(x)\delta' = a + b = \delta(x)$. So $\delta$ is an instance of the computed unifier, with
+  $\rho = \delta'$.
+\end{example}
+
+\begin{lemma}[completeness of a round, \isa{ac\_round\_complete}]
+  Assume the solver is total. Let $P$ consist of AC pairs, let $\delta$ unify $P \mathbin{@} R$
+  and AC-fix $\sigma$, and let the variable invariant hold. Then some result
+  $(R', \sigma', \mathit{nv}')$ of $\mathit{ac\_round}\ P\ R\ \sigma\ \mathit{nv}$ and some
+  $\delta'$ agreeing with $\delta$ below $\mathit{nv}$ are such that $\delta'$ unifies $R'$,
+  AC-fixes $\sigma'$, and the invariant holds for $R'$, $\sigma'$ and $\mathit{nv}'$.
+\end{lemma}
+
+\begin{theorem}[completeness on the domain, \isa{acunif\_complete}]
+  Assume the solver is total, the computation of $\mathit{acunif}\ P\ \sigma\ \mathit{nv}$
+  terminates, $\delta$ unifies $P$ and AC-fixes $\sigma$, and the variable invariant holds. Then
+  some result $\theta$ and some $\delta'$ agreeing with $\delta$ below $\mathit{nv}$ are such
+  that $\delta'$ AC-fixes $\theta$.
+\end{theorem}
+
+Combining these with the termination theorem of the next section:
+
+\begin{theorem}[completeness, \isa{ac\_unifiers\_complete}]
+  Assume the Diophantine solver is total. If $s\delta \eqAC t\delta$, then there are
+  $\theta \in \mathit{ac\_unifiers}\ s\ t$ and $\rho$ such that $\delta(x) \eqAC \theta(x)\rho$ for
+  every $x \in \vars(s) \cup \vars(t)$.
+\end{theorem}
+
+%======================================================================
+\section{Termination}\label{sec:term}
+%======================================================================
+
+Termination of Stickel's algorithm for nested problems with several AC symbols is the delicate
+part. We follow the lexicographic measure of the appendix of the PVS
+development~\cite{AyalaRincon24}, adapted to flattened terms.
+
+\subsection{Flattened subterms and the measure}
+
+For a non-variable term $t$, the \emph{flattened arguments} $\targs(t)$ are $\args_f(t)$ if $t$ is
+an AC application of $f$, and the usual arguments otherwise. The \emph{key} of $t = g(\dots)$ is
+the pair of $g$ and a flag telling whether $t$ is an AC application. The flattened subterms
+$\fsub(t)$ are $t$ together with the flattened subterms of its flattened arguments; for a problem
+$P$, $\Sub(P)$ is the union of the $\fsub(u)$ for $u \in \sides(P)$.
+
+\begin{definition}[components of the measure]
+  For a problem $P$:
+  \begin{itemize}[nosep]
+    \item $\VNAC(P)$ is the set of variables $x$ such that $x$ is a side of $P$, or $x$ is a
+          flattened argument of a term of $\Sub(P)$ that is not an AC application;
+    \item $\Vtwo(P)$ is the set of variables that are flattened arguments of two terms of
+          $\Sub(P)$ with different keys;
+    \item $\AS(P)$, the \emph{admissible subterms}, is the set of non-variable terms $u$ that are
+          proper flattened subterms of a side of $P$;
+    \item $\psize(P)$ is the sum of the sizes of all sides of $P$.
+  \end{itemize}
+  The measure of $P$ is the quadruple
+  $\bigl(|\VNAC(P)|, |\Vtwo(P)|, |\AS(P)|, \psize(P)\bigr)$, ordered lexicographically.
+\end{definition}
+
+All four components are natural numbers, so the lexicographic order is well-founded.
+
+\begin{example}\label{ex:measure}
+  Let $+$ be AC and $g$ free, and $P = [\,x + g(y) \approx^? y + z\,]$. The flattened subterms
+  are $x + g(y)$, $x$, $g(y)$, $y$, $y + z$ and $z$. No side is a variable; the only term of
+  $\Sub(P)$ that is not an AC application and has a variable argument is $g(y)$, so
+  $\VNAC(P) = \{y\}$. The variable $y$ is an argument both of $g(y)$, with key $(g,
+  \mathit{false})$, and of $y + z$, with key $(+, \mathit{true})$, so $\Vtwo(P) = \{y\}$; $x$ and
+  $z$ only occur below $+$. Finally $\AS(P) = \{g(y)\}$. The measure is $(1, 1, 1, \psize(P))$.
+
+  The AC step gives $w = (x, g(y), y, z)$, the equation $X_1 + X_2 = Y_1 + Y_2$, and the basis
+  $p = (1,0,1,0)$, $q = (1,0,0,1)$, $r = (0,1,1,0)$, $s = (0,1,0,1)$. The column of $g(y)$ must
+  sum to $1$, so exactly one of $r, s$ is chosen, and four alternatives remain:
+  \begin{itemize}[nosep,leftmargin=*]
+    \item $[q, r]$ and $[p, q, r]$ pair $g(y)$ with $y$ and contain $y \approx^? z_1$ or
+          $y \approx^? z_0 + z_2$ with $z_1$, $z_2$ bound to $g(y)$; instantiation fails on the
+          occurs check;
+    \item $[p, s]$: $x \approx^? z_0$, $g(y) \approx^? z_1$, $y \approx^? z_0$, $z \approx^? z_1$
+          gives $\theta = \{x \mapsto y,\ z \mapsto g(y)\}$ on the original variables;
+    \item $[p, q, s]$: $x \approx^? z_0 + z_1$, $g(y) \approx^? z_2$, $y \approx^? z_0$,
+          $z \approx^? z_1 + z_2$ gives $\theta = \{x \mapsto y + z_1,\ z \mapsto z_1 + g(y)\}$.
+  \end{itemize}
+  In both successful branches nothing is kept and the round ends with the empty problem, of
+  measure $(0,0,0,0)$. Note that $\theta(y) = y$ in both, in accordance with the hypothesis
+  of Lemma~\ref{lem:as-step}: the variable $y \in \Vtwo(P)$ is not bound to a non-variable
+  term. So $\mathit{ac\_unifiers}$ returns two unifiers.
+\end{example}
+
+\subsection{The syntactic steps}
+
+\begin{lemma}[\isa{mless\_delete}, \isa{mless\_elim}, \isa{mless\_decomp}]
+  Each step of the main loop on a non-AC pair decreases the measure:
+  \begin{enumerate}[nosep]
+    \item deletion does not increase $\VNAC$, $\Vtwo$ and $\AS$, and decreases $\psize$;
+    \item elimination of $x$ decreases $\VNAC$: the new problem has $\VNAC \subseteq \VNAC(P)
+          \setminus\{x\}$, while $x \in \VNAC(P)$ since $x$ is a side;
+    \item decomposition of $g(t_1..t_n) \approx^? g(s_1..s_n)$, which is not an AC pair, does
+          not increase $\VNAC$, $\Vtwo$ and $\AS$ (the new sides are flattened arguments of a
+          non-AC application), and decreases $\psize$.
+  \end{enumerate}
+  None of these steps introduces new variables.
+\end{lemma}
+
+The elimination case uses a characterization of the flattened subterms of an instance: every
+$T \in \fsub(v\sigma)$ is either $w\sigma$ for some non-variable $w \in \fsub(v)$, or lies in
+$\fsub(\sigma(x))$ for some $x \in \vars(v)$; in the latter case, when $T = \sigma(x)$, either
+$v = x$ or $x$ is a flattened argument of some $w \in \fsub(v)$ that is not an AC application of
+the same symbol as $\sigma(x)$ (\isa{fsub\_subst}).
+
+\subsection{One AC step}
+
+Consider one step of an AC round: an AC pair $t \approx^? s$ of $f$ is solved by an alternative
+$C$ of $\mathit{solve\_ac}$, $\mathit{inst}\ C = (R, \theta)$, and the problem
+$S_0 = (t\approx^?s) \# Q$ becomes $S_1 = Q\theta \mathbin{@} R$, where all sides of $Q$ are
+non-variable terms with variables below $\mathit{nv}$. The substitution $\theta$ is idempotent,
+and its non-trivial bindings have a precise shape: a binding $\theta(x)$ that is not a variable
+is either $u\theta$ for a non-variable argument $u$ of $t$ or $s$, or an AC application of $f$
+whose arguments are fresh variables fixed by $\theta$ or terms $u\theta$ as before.
+
+\begin{lemma}[\isa{dom\_orig}, \isa{fixed\_low}, \isa{img\_shape}]\label{lem:theta}
+  The following hold.
+  \begin{enumerate}[nosep]
+    \item If $x < \mathit{nv}$ and $\theta(x) \neq x$, then $x$ is a flattened argument of $t$
+          or of $s$; in particular $\theta(x) = x$ if $x < \mathit{nv}$ does not occur in $t$ or $s$.
+    \item If $\theta(y)$ is not a variable, then either $\theta(y) = u\theta$ for a non-variable
+          argument $u$ of $t$ or $s$, or $\theta(y)$ is an AC application of $f$ each of whose
+          $f$-arguments is a variable fixed by $\theta$ or such a $u\theta$.
+    \item All variables of $S_1$ are fixed by $\theta$, and
+          $\vars(S_1) \subseteq \vars(S_0) \cup \{\mathit{nv}, \dots, \mathit{nv}'-1\}$
+          (\isa{S1\_fixed}, \isa{S1\_vars}).
+  \end{enumerate}
+\end{lemma}
+
+Let $\psi(x) = y$ if $\theta(x)$ is the variable $y$, and $\psi(x) = x$ otherwise.
+
+\begin{lemma}[PVS Lemmas 17 and 18]
+  $\VNAC(S_1) \subseteq \psi(\VNAC(S_0))$ and $\Vtwo(S_1) \subseteq \psi(\Vtwo(S_0))$.
+\end{lemma}
+
+\begin{lemma}[PVS Lemmas 22 and 23]\label{lem:as-step}
+  If $\theta(x)$ is a variable for every $x \in \Vtwo(S_0)$, then
+  \[
+    \AS(S_1) \subseteq \AS(S_0)\theta \qquad\text{and}\qquad \sides(R) \subseteq \AS(S_0)\theta.
+  \]
+\end{lemma}
+
+\begin{proof}[Proof sketch]
+  By induction on the size of $v\theta$, every non-variable proper flattened subterm $T$ of
+  $v\theta$, for a non-variable $v$ that is a side or an admissible subterm of $S_0$, belongs to
+  $\AS(S_0)\theta$. By the characterization of $\fsub(v\theta)$, either $T = w\theta$ with
+  $w$ a proper flattened subterm of $v$, or $T$ lies inside a binding $\theta(x)$. In the second
+  case the shape of the bindings reduces the claim to smaller arguments of $t$ and $s$, except
+  when $T = \theta(x)$ is an AC application of $f$ and $x$ occurs in a term $w$ that is not an AC
+  application of $f$. Then $x$ is an argument both of $w$ and of $t$ or $s$, which have different
+  keys, so $x\in\Vtwo(S_0)$, and the hypothesis says that $\theta(x)$ is a variable, a
+  contradiction.
+\end{proof}
+
+\subsection{One AC round}
+
+The step lemmas are composed along a round by induction on $\mathit{ac\_round}$.
+
+\begin{lemma}[\isa{ac\_round\_meas}]
+  Let $P$ consist of AC pairs, let all sides of $P \mathbin{@} R$ be non-variable terms and
+  $\vars(P \mathbin{@} R) \subseteq \{0,\dots,\mathit{nv}-1\}$. For every result
+  $(P_n, \sigma_n, \mathit{nv}_n)$ of $\mathit{ac\_round}\ P\ R\ \sigma\ \mathit{nv}$ there is a
+  function $F$ on variables such that
+  \begin{enumerate}[nosep]
+    \item $\VNAC(P_n) \subseteq F(\VNAC(P \mathbin{@} R))$ and
+          $\Vtwo(P_n) \subseteq F(\Vtwo(P \mathbin{@} R))$;
+    \item $F(x) = x$ for every $x < \mathit{nv}$ not occurring in $P \mathbin{@} R$;
+    \item every variable of $P_n$ occurs in $P \mathbin{@} R$ or is at least $\mathit{nv}$, and
+          is below $\mathit{nv}_n$;
+    \item if $\Vtwo(P_n) = F(\Vtwo(P \mathbin{@} R))$, there is $\rho$ with
+          $\AS(P_n) \subseteq \AS(P \mathbin{@} R)\rho$ and
+          $\sides(P_n) \subseteq (\AS(P \mathbin{@} R) \cup \sides(R))\rho$.
+  \end{enumerate}
+\end{lemma}
+
+\begin{proof}[Proof sketch]
+  $F$ is the composition of the renamings $\psi$ of the steps, and $\rho$ the composition of the
+  substitutions $\theta$. The key point is item 4: we must derive the hypothesis of
+  Lemma~\ref{lem:as-step} at each step from the equality at the end of the round. Suppose that at
+  some step a variable $X \in \Vtwo(S_0)$ is bound to a non-variable term. Then $\psi(X) = X$, and
+  $X$ does not occur in $S_1$, since $\theta$ is idempotent. By items 2 and 3 for the rest of the
+  round, the later renamings leave $X$ unchanged and $X$ does not occur in $P_n$. Hence $X =
+  F(X) \in F(\Vtwo(P \mathbin{@} R)) = \Vtwo(P_n) \subseteq \vars(P_n)$, a contradiction.
+\end{proof}
+
+\begin{theorem}[\isa{ac\_round\_mless}]
+  If $P \neq []$ consists of AC pairs with variables below $\mathit{nv}$, every result $P_n$ of the
+  round $\mathit{ac\_round}\ P\ []\ \sigma\ \mathit{nv}$ has a strictly smaller measure than $P$.
+\end{theorem}
+
+\begin{proof}
+  By item 1, $|\VNAC(P_n)| \le |\VNAC(P)|$ and $|\Vtwo(P_n)| \le |\Vtwo(P)|$. If one of them is
+  strict we are done. Otherwise $|\Vtwo(P_n)| = |\Vtwo(P)| \ge |F(\Vtwo(P))|$, and with item 1 this
+  forces $\Vtwo(P_n) = F(\Vtwo(P))$; item 4 then gives $\rho$. If $P_n = []$, the last two
+  components of its measure are $0$, while $\psize(P) > 0$. Otherwise, let $m$ be a side of $P_n$
+  of maximal size. Then $m \in \AS(P)\rho$, but $m \notin \AS(P_n)$, since an admissible subterm
+  of $P_n$ is strictly smaller than some side of $P_n$. Therefore
+  $\AS(P_n) \subsetneq \AS(P)\rho$ and $|\AS(P_n)| < |\AS(P)\rho| \le |\AS(P)|$.
+\end{proof}
+
+\subsection{Termination of the algorithm}
+
+\begin{theorem}[\isa{acunif\_dom}]
+  For every problem $P$ with variables below $\mathit{nv}$ and every $\sigma$, the computation of
+  $\mathit{acunif}\ P\ \sigma\ \mathit{nv}$ terminates. In particular
+  $\mathit{ac\_unifiers}\ s\ t$ is defined for all terms $s$ and $t$.
+\end{theorem}
+
+\begin{proof}
+  By well-founded induction on the measure, using the introduction rules of the domain predicate.
+  Each syntactic step decreases the measure and preserves the bound on the variables; each result
+  of an AC round has a smaller measure and its variables are below the new bound.
+\end{proof}
+
+%======================================================================
+\section{Discussion}\label{sec:disc}
+%======================================================================
+
+\subsection{Main results}
+
+For the Contejean--Devie solver, the final theorems read as follows, without any hypothesis.
+
+\begin{corollary}
+  Let $\mathit{ac\_unifiers}$ be instantiated with the Contejean--Devie solver. For all terms $s$
+  and $t$:
+  \begin{enumerate}[nosep]
+    \item the computation of $\mathit{ac\_unifiers}\ s\ t$ terminates;
+    \item every $\theta \in \mathit{ac\_unifiers}\ s\ t$ satisfies $s\theta \eqAC t\theta$;
+    \item for every $\delta$ with $s\delta \eqAC t\delta$ there are
+          $\theta \in \mathit{ac\_unifiers}\ s\ t$ and $\rho$ with $\delta(x) \eqAC \theta(x)\rho$
+          for all $x \in \vars(s) \cup \vars(t)$.
+  \end{enumerate}
+\end{corollary}
+
+Two immediate consequences, not stated separately in the formalization, are worth recording.
+First, for a total solver, $s$ and $t$ are AC-unifiable if and only if
+$\mathit{ac\_unifiers}\ s\ t \neq []$, which gives a decision procedure for AC-unifiability.
+Second, AC-unification with any number of AC symbols and free symbols is finitary: the computed
+list is a finite complete set of AC-unifiers. The computed set is not necessarily minimal.
+
+\subsection{Main formal results}
+
+\begin{center}
+\small
+\begin{tabular}{@{}p{0.48\textwidth}p{0.46\textwidth}@{}}
+  \toprule
+  Result & Isabelle name\\
+  \midrule
+  AC equality is decided by normal forms & \isa{eq\_AC\_iff\_nf}\\
+  AC preserves sizes & \isa{eq\_AC\_size}\\
+  Minimal solutions generate all solutions & \isa{Solutions\_gen\_by}\\
+  Correctness of Contejean--Devie & \isa{cd\_solve\_correct}\\
+  Termination of Contejean--Devie & \isa{cd\_terminates}\\
+  Soundness of an AC step & \isa{solve\_ac\_sound}\\
+  Soundness of the algorithm & \isa{acunif\_sound}\\
+  Completeness of an AC step & \isa{solve\_ac\_complete}\\
+  Completeness of the algorithm & \isa{acunif\_complete}\\
+  Measure of one AC step & \isa{VNAC\_step}, \isa{V2\_step}, \isa{AS\_step}\\
+  Measure of one AC round & \isa{ac\_round\_meas}, \isa{ac\_round\_mless}\\
+  Termination of the algorithm & \isa{acunif\_dom}\\
+  Final theorems & \isa{ac\_unifiers\_sound}, \isa{ac\_unifiers\_complete}\\
+  Instance with Contejean--Devie & \isa{ac\_unifiers\_cd\_sound},\newline \isa{ac\_unifiers\_cd\_complete}\\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Differences with the PVS development}
+
+\begin{itemize}[leftmargin=*]
+  \item \emph{Diophantine equations.} PVS enumerates candidate solutions up to a bound. Here the
+        solver is an abstract parameter; soundness and termination hold for every solver, and
+        completeness for every total one. The Contejean--Devie instance computes exactly the
+        minimal solutions and is proved to terminate.
+  \item \emph{Completeness.} Instead of renamings and restrictions of substitutions to the
+        variables of the input, the proof keeps the invariant that an extension of the given
+        unifier AC-fixes the computed substitution. This also removes the hypothesis, present in
+        PVS, that the domain of the given unifier is contained in the variables of the problem.
+  \item \emph{Signature.} Several AC symbols are given by a predicate. Since AC axioms only concern
+        binary applications, other uses of AC symbols are free, and no well-formedness invariant
+        on terms is needed.
+  \item \emph{Axioms.} AC is defined by the set of all instances of its axioms, within a general
+        inductive definition of equational theories, rather than by axioms over fixed variables.
+  \item \emph{Partial definition.} The algorithm is defined as a partial function; soundness and
+        completeness are proved by partial induction, and the termination theorem then
+        discharges the domain conditions.
+\end{itemize}
+
+\subsection{Structure of the formalization}
+
+\begin{center}
+\begin{tabular}{@{}llr@{}}
+  \toprule
+  Theory & Content & Lines\\
+  \midrule
+  \isa{Equational\_Theory} & equational theories & 120\\
+  \isa{AC\_Theory} & AC axioms of one symbol & 92\\
+  \isa{AC\_Terms} & several AC symbols, normal forms, flattening & 468\\
+  \isa{Dioph\_Solver} & interface to Diophantine solvers & 96\\
+  \isa{Dioph\_CD} & Contejean--Devie algorithm and its correctness & 539\\
+  \isa{Dioph\_CD\_Termination} & termination of Contejean--Devie & 548\\
+  \isa{AC\_Unif\_Algorithm} & the unification algorithm & 206\\
+  \isa{AC\_Unif\_Soundness} & soundness & 560\\
+  \isa{AC\_Unif\_Completeness} & completeness & 951\\
+  \isa{AC\_Unif\_Termination} & termination & 2\,596\\
+  \isa{AC\_Unif\_CD} & instantiation with Contejean--Devie & 51\\
+  \midrule
+  Total & & 6\,227\\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\begin{thebibliography}{9}
+\bibitem{AyalaRincon22}
+M.~Ayala-Rinc\'on, M.~Fern\'andez, G.~F.~Silva, D.~Nantes-Sobrinho.
+\newblock A certified algorithm for AC-unification.
+\newblock In \emph{Formal Structures for Computation and Deduction (FSCD)}, 2022.
+
+\bibitem{AyalaRincon24}
+M.~Ayala-Rinc\'on, M.~Fern\'andez, G.~F.~Silva, T.~Kutsia, D.~Nantes-Sobrinho.
+\newblock Certified first-order AC-unification and applications.
+\newblock \emph{Journal of Automated Reasoning}, 2024.
+
+\bibitem{BCD90}
+A.~Boudet, E.~Contejean, H.~Devie.
+\newblock A new AC unification algorithm with an algorithm for solving systems of Diophantine
+equations.
+\newblock In \emph{Logic in Computer Science (LICS)}, 1990.
+
+\bibitem{CD94}
+E.~Contejean, H.~Devie.
+\newblock An efficient incremental algorithm for solving systems of linear Diophantine equations.
+\newblock \emph{Information and Computation}, 113(1), 1994.
+
+\bibitem{Fages87}
+F.~Fages.
+\newblock Associative-commutative unification.
+\newblock \emph{Journal of Symbolic Computation}, 3(3), 1987.
+
+\bibitem{Stickel81}
+M.~E.~Stickel.
+\newblock A unification algorithm for associative-commutative functions.
+\newblock \emph{Journal of the ACM}, 28(3), 1981.
+
+\bibitem{AFP-FOT}
+C.~Sternagel, R.~Thiemann.
+\newblock First-order terms.
+\newblock \emph{Archive of Formal Proofs}, 2018.
+
+\bibitem{AFP-HLDE}
+F.~Me{\ss}ner, J.~Parsert, J.~Sch\"opf, C.~Sternagel.
+\newblock Homogeneous linear Diophantine equations.
+\newblock \emph{Archive of Formal Proofs}, 2017.
+
+\bibitem{AFP-Farkas}
+R.~Bottesch, M.~W.~Haslbeck, R.~Thiemann.
+\newblock Farkas' lemma and Motzkin's transposition theorem.
+\newblock \emph{Archive of Formal Proofs}, 2019.
+\end{thebibliography}
+
+\end{document}
